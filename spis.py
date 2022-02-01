@@ -8,7 +8,6 @@ from enum import Enum
 from datetime import datetime, date, timedelta
 from dateutil import parser
 
-# python310 -m pip install git+https://github.com/Pycord-Development/pycord.git@2d204e2b0e20e9420c89b037d74e3493cc1b2981
 # https://discord.com/api/oauth2/authorize?client_id=931867818599780402&permissions=285615713344&scope=applications.commands%20bot
 
 EDYTOR_SERWER = 885830592665628702
@@ -245,7 +244,7 @@ async def spis(
     """Wyświetla aktualny stan spisu"""
 
     styl = oryginalny
-    wynik = styl(statystyki_dla_nerdow)
+    wynik = styl(statystyki_dla_nerdow)  # TODO: sprawdź pustą wiadomość
     if type(wynik) == str:
         await ctx.respond(wynik, ephemeral=True)
     else:
@@ -273,4 +272,6 @@ def main(token: str):
 
 if __name__ == '__main__':
     from sys import argv
-    main(argv[1])  # Token jest wczytywany z pierwszego argumentu podanego przy uruchamianiu
+    from os import environ
+    # Token jest wczytywany ze zmiennej środowiskowej lub pierwszego argumentu podanego przy uruchamianiu
+    main(environ.get("SpisToken") or argv[1])
