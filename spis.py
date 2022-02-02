@@ -10,13 +10,16 @@ from discord import commands  # uwaga, zwykłe commands, nie discord.ext.command
 from discord.ext import tasks
 
 
-EDYTOR_SERWER = 885830592665628702
-EDYTOR_ROLA = 931891996577103892
+# ------------------------- STAŁE
+
+# Format: id_serwera, id_roli
+EDYTOR = 885830592665628702, 931891996577103892
+DEV = 885830592665628702, 938146467749707826
 
 # ------------------------- STRUKTURY DANYCH
 
 
-class PolskiDateParser(parser.parserinfo):  # TODO: dodać informacje do readme, bo why not
+class PolskiDateParser(parser.parserinfo):
     """Klasa rozszerzająca parserinfo z dateutil.
     Pozwala ona na wprowadzanie dat w polskim formacie."""
 
@@ -72,7 +75,7 @@ class Przedmioty(Enum):
     BIOLOGIA = "Biologia", "🐟", "🍃"
     GEOGRAFIA = "Geografia", "🌍"
     WYCHOWAWCZA = "Godzina wychowawcza", "✏️"
-    INNY = "?", "❓"
+    INNY = "Inne", "❓"
 
     @property
     def nazwa(self) -> str:
@@ -180,8 +183,8 @@ def pythonowe_repr(dev: bool) -> dict[str, Any]:
 # ------------------------- KOMENDY
 
 
-@bot.slash_command(guild_ids=[EDYTOR_SERWER], default_permission=False)
-@discord.commands.permissions.has_role(EDYTOR_ROLA, EDYTOR_SERWER)
+@bot.slash_command(guild_ids=[EDYTOR[0]], default_permission=False)
+@discord.commands.permissions.has_role(EDYTOR[1], EDYTOR[0])
 async def dodaj_zadanie(
         ctx: commands.ApplicationContext,
         opis: commands.Option(str, "Treść zadania domowego"),
@@ -212,8 +215,8 @@ async def dodaj_zadanie(
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
 
 
-@bot.slash_command(guild_ids=[EDYTOR_SERWER], default_permission=False)
-@discord.commands.permissions.has_role(EDYTOR_ROLA, EDYTOR_SERWER)
+@bot.slash_command(guild_ids=[EDYTOR[0]], default_permission=False)
+@discord.commands.permissions.has_role(EDYTOR[1], EDYTOR[0])
 async def usun_zadanie(
         ctx: commands.ApplicationContext,
         id_zadania: commands.Option(str, "ID zadania do usunięcia")
