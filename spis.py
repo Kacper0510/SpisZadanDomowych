@@ -1,14 +1,14 @@
+from dataclasses import dataclass, field
+from datetime import datetime, date, timedelta
+from enum import Enum
 from functools import cache
-from typing import Union, cast, Iterable
+from typing import cast, Iterable, Any
+
 import discord
+from dateutil import parser
 from discord import commands  # uwaga, zwykłe commands, nie discord.ext.commands
 from discord.ext import tasks
-from dataclasses import dataclass, field
-from enum import Enum
-from datetime import datetime, date, timedelta
-from dateutil import parser
 
-# https://discord.com/api/oauth2/authorize?client_id=931867818599780402&permissions=285615713344&scope=applications.commands%20bot
 
 EDYTOR_SERWER = 885830592665628702
 EDYTOR_ROLA = 931891996577103892
@@ -16,7 +16,7 @@ EDYTOR_ROLA = 931891996577103892
 # ------------------------- STRUKTURY DANYCH
 
 
-class PolskiDateParser(parser.parserinfo):
+class PolskiDateParser(parser.parserinfo):  # TODO: dodać informacje do readme, bo why not
     """Klasa rozszerzająca parserinfo z dateutil.
     Pozwala ona na wprowadzanie dat w polskim formacie."""
 
@@ -149,7 +149,7 @@ def _sorted_spis() -> list[ZadanieDomowe]:
     return sorted(cast(Iterable, lista_zadan))
 
 
-def oryginalny(dev: bool) -> Union[str, discord.Embed]:
+def oryginalny(dev: bool) -> dict[str, Any]:
     """Oryginalny styl spisu jeszcze sprzed istnienia tego bota (domyślne)"""
 
     wiadomosc = ""
@@ -170,12 +170,12 @@ def oryginalny(dev: bool) -> Union[str, discord.Embed]:
 
         wiadomosc += f"{emoji}**{zadanie.przedmiot.nazwa}**{emoji}{dodatkowe}:{czas} {zadanie.tresc}\n"
 
-    return wiadomosc.strip()
+    return {"content": wiadomosc.strip()}
 
 
-def pythonowe_repr(dev: bool) -> Union[str, discord.Embed]:
+def pythonowe_repr(dev: bool) -> dict[str, Any]:
     """Lista wywołań Pythonowego repr() na każdym zadaniu domowym"""
-    return "\n".join([(f'{zadanie.id}: ' if dev else '') + repr(zadanie) for zadanie in _sorted_spis()])
+    return {"content": "\n".join([(f'{zadanie.id}: ' if dev else '') + repr(zadanie) for zadanie in _sorted_spis()])}
 
 # ------------------------- KOMENDY
 
@@ -244,11 +244,11 @@ async def spis(
     """Wyświetla aktualny stan spisu"""
 
     styl = oryginalny
-    wynik = styl(statystyki_dla_nerdow)  # TODO: sprawdź pustą wiadomość
-    if type(wynik) == str:
-        await ctx.respond(wynik, ephemeral=True)
+    wynik = styl(statystyki_dla_nerdow)
+    if len(wynik) == 1 and "content" in wynik and not wynik["content"]:
+        await ctx.respond("Spis jest aktualnie pusty!", ephemeral=True)
     else:
-        await ctx.respond("", embed=wynik, ephemeral=True)
+        await ctx.respond(ephemeral=True, **wynik)
 
 # ------------------------- START BOTA
 
