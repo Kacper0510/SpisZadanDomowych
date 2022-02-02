@@ -5,24 +5,21 @@ Jest to bot służący do zarządzania i wyświetlania spisu zadań domowych na 
 
 ## Komendy
 
-### `/spis [statystyki_dla_nerdow: prawda|fałsz]`
-**Uwaga!** Komenda globalna.
+### Globalne
 
+> #### /spis \[statystyki_dla_nerdow: prawda|fałsz]
 ![Wyświetla aktualny stan spisu](https://cdn.discordapp.com/attachments/931884001680031754/938163792209129522/unknown.png)
-<br/><br/>
 
-### `/dodaj_zadanie <opis: string> <termin: data|godzina> [przedmiot: string]`
-**Uwaga!** Komenda tylko dla edytorów z odpowiednią rolą.
+### Dla edytorów
 
+> #### /dodaj_zadanie <opis: string> <termin: data|godzina> \[przedmiot: string]
 ![Dodaje nowe zadanie do spisu](https://cdn.discordapp.com/attachments/931884001680031754/938164516062101534/unknown.png)
-<br/><br/>
 
-### `/usun_zadanie <id: string>`
-**Uwaga!** Komenda tylko dla edytorów z odpowiednią rolą.
-
+> #### /usun_zadanie <id: string>
 ![Usuwa zadanie o podanym ID ze spisu](https://cdn.discordapp.com/attachments/931884001680031754/938165033106538526/unknown.png)
 
 ## Format daty
+
 Data/godzina przekazywana do bota np. w komendzie **/dodaj_zadanie** zamieniana jest na obiekt typu datetime przez moduł `dateutil.parser`.
 Dzięki temu większość polskich formatów dat zostaje przyjęta i poprawnie zamieniona.
 
@@ -30,6 +27,7 @@ Użytkownik może podać datę, godzinę, dzień tygodnia lub kilka z tych rzecz
 W przypadku niejednoznacznych dat (np. **01.02.03**), domyślny format to **DD.MM.RR**.
 
 ### Dozwolone oznaczenia miesięcy
+
 |Numer|Skrót|Odmieniona nazwa|Pełna nazwa|Cyfra rzymska|
 |---|---|---|---|---|
 |01|sty|stycznia|styczeń<br/>styczen|I|
@@ -46,6 +44,7 @@ W przypadku niejednoznacznych dat (np. **01.02.03**), domyślny format to **DD.M
 |12|gru|grudnia|grudzień<br/>grudzien|XII|
 
 ### Dozwolone oznaczenia dni tygodnia
+
 |Numer|2-literowy skrót|Pełna nazwa|3-literowy skrót|
 |---|---|---|---|
 |1|pn<br/>po|poniedziałek<br/>poniedzialek|pon|

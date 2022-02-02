@@ -12,9 +12,9 @@ from discord.ext import tasks
 
 # ------------------------- STAŁE
 
-# Format: id_serwera, id_roli
-EDYTOR = 885830592665628702, 931891996577103892
-DEV = 885830592665628702, 938146467749707826
+# Format: ID roli, ID serwera
+EDYTOR = 931891996577103892, 885830592665628702
+DEV = 938146467749707826, 885830592665628702
 
 # ------------------------- STRUKTURY DANYCH
 
@@ -89,9 +89,9 @@ class Przedmioty(Enum):
 
     @classmethod
     @cache
-    def lista(cls) -> tuple[str]:
-        """Zwraca listę nazw przedmiotów, przekonwertowaną na małe litery"""
-        return tuple(str(p.name).lower() for p in cls)
+    def lista(cls) -> dict[str, Any]:  # Any, bo Przedmioty jeszcze nie są zadeklarowane
+        """Zwraca dict listy nazw (key) i przedmiotów o tej nazwie (value)"""
+        return {cast(str, p.nazwa): p for p in cls}
 
 
 @dataclass(order=True, unsafe_hash=True)
@@ -183,8 +183,8 @@ def pythonowe_repr(dev: bool) -> dict[str, Any]:
 # ------------------------- KOMENDY
 
 
-@bot.slash_command(guild_ids=[EDYTOR[0]], default_permission=False)
-@discord.commands.permissions.has_role(EDYTOR[1], EDYTOR[0])
+@bot.slash_command(guild_ids=[EDYTOR[1]], default_permission=False)
+@discord.commands.permissions.has_role(*EDYTOR)
 async def dodaj_zadanie(
         ctx: commands.ApplicationContext,
         opis: commands.Option(str, "Treść zadania domowego"),
@@ -195,8 +195,8 @@ async def dodaj_zadanie(
         przedmiot: commands.Option(
             str,
             "Przedmiot szkolny, z którego zadane jest zadanie",
-            choices=Przedmioty.lista(),
-            default=Przedmioty.INNY.name.lower()
+            choices=Przedmioty.lista().keys(),
+            default=Przedmioty.INNY.nazwa
         )
 ):
     """Dodaje nowe zadanie do spisu"""
@@ -210,13 +210,14 @@ async def dodaj_zadanie(
         await ctx.respond("Wystąpił błąd przy konwersji daty!")
         return
 
-    nowe_zadanie = ZadanieDomowe(data, Przedmioty[przedmiot.upper()], opis)  # Tworzy obiekt zadania i dodaje do spisu
+    # Tworzy obiekt zadania i dodaje do spisu
+    nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis)
     lista_zadan.append(nowe_zadanie)
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
 
 
-@bot.slash_command(guild_ids=[EDYTOR[0]], default_permission=False)
-@discord.commands.permissions.has_role(EDYTOR[1], EDYTOR[0])
+@bot.slash_command(guild_ids=[EDYTOR[1]], default_permission=False)
+@discord.commands.permissions.has_role(*EDYTOR)
 async def usun_zadanie(
         ctx: commands.ApplicationContext,
         id_zadania: commands.Option(str, "ID zadania do usunięcia")
@@ -242,16 +243,22 @@ async def usun_zadanie(
 @bot.slash_command()
 async def spis(
         ctx: commands.ApplicationContext,
-        statystyki_dla_nerdow: commands.Option(bool, "Czy chcesz wyświetlić informacje typu ID zadania?", default=False)
+        dodatkowe_opcje: commands.Option(
+            str,
+            "Pozwala na włączenie dodatkowej opcji formatowania lub wysłania wiadomości",
+            choices=["Statystyki dla nerdów", "Wyślij wiadomość jako widoczną dla wszystkich", "Brak"],
+            default="Brak"
+        )
 ):
     """Wyświetla aktualny stan spisu"""
 
     styl = oryginalny
-    wynik = styl(statystyki_dla_nerdow)
+    wynik = styl(dodatkowe_opcje == "Statystyki dla nerdów")
     if len(wynik) == 1 and "content" in wynik and not wynik["content"]:
-        await ctx.respond("Spis jest aktualnie pusty!", ephemeral=True)
+        await ctx.respond("Spis jest aktualnie pusty!",
+                          ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"))
     else:
-        await ctx.respond(ephemeral=True, **wynik)
+        await ctx.respond(ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"), **wynik)
 
 # ------------------------- START BOTA
 
