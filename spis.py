@@ -277,6 +277,22 @@ async def spis(
     else:
         await ctx.respond(ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"), **wynik)
 
+
+@bot.slash_command(guild_ids=[DEV[1]], default_permission=False)
+@discord.commands.permissions.has_role(*DEV)
+async def zapisz_stan(ctx: commands.ApplicationContext):
+    """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
+
+    # TODO
+
+
+@bot.slash_command(guild_ids=[DEV[1]], default_permission=False)
+@discord.commands.permissions.has_role(*DEV)
+async def wczytaj_stan(ctx: commands.ApplicationContext):
+    """Wczytuje stan bota z kanału prywatnego twórcy bota (liczy się tylko ostatnia wiadomość)"""
+
+    # TODO
+
 # ------------------------- START BOTA
 
 
