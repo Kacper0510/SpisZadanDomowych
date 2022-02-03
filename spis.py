@@ -77,6 +77,10 @@ class Przedmioty(Enum):
     WYCHOWAWCZA = "Godzina wychowawcza", "✏️"
     INNY = "Inne", "❓"
 
+    def __reduce_ex__(self, protocol):
+        """Pozwala na skuteczniejsze pamięciowo picklowanie przedmiotów poprzez zapamiętanie tylko nazwy"""
+        return getattr, (self.__class__, self.name)
+
     @property
     def nazwa(self) -> str:
         """Zwraca nazwę przedmiotu"""
@@ -130,6 +134,19 @@ class ZadanieDomowe:
         self.tresc = tresc
         self.termin = termin
         self.przedmiot = przedmiot
+        self.task = self.stworz_task()
+
+    def __del__(self):
+        """Przy destrukcji obiektu kończy też task"""
+        self.task.cancel()
+
+    def __getstate__(self) -> tuple:
+        """Zapisuje w pickle wszystkie dane zadania domowego oprócz taska"""
+        return self.termin, self.przedmiot, self.tresc
+
+    def __setstate__(self, state: tuple):
+        """Wczytuje stan obiektu z pickle"""
+        self.termin, self.przedmiot, self.tresc = state
         self.task = self.stworz_task()
 
     @property
