@@ -161,7 +161,8 @@ def oryginalny(dev: bool) -> dict[str, Any]:
         # Wyświetlanie dni
         if (data_zadania := zadanie.termin.date()) > dzien:
             wiadomosc += f"\n{PDP_INSTANCE.WEEKDAYS[data_zadania.weekday()][1].capitalize()}, " \
-                         f"{data_zadania.day} {PDP_INSTANCE.MONTHS[data_zadania.month - 1][1]}:\n"
+                         f"{data_zadania.day} {PDP_INSTANCE.MONTHS[data_zadania.month - 1][1]}" \
+                         f"{f' {rok}' if (rok := data_zadania.year) != date.today().year else ''}:\n"
             dzien = data_zadania
 
         # Wypisywane tylko gdy czas był podany przy tworzeniu zadania
