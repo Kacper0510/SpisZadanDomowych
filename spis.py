@@ -185,6 +185,12 @@ class StanBota:
             dane = await ostatnia_wiadomosc.attachments[0].read()
             global stan
             stan = pickle.loads(dane, fix_imports=False)
+
+            # Usuń zadania z przeszłości
+            for zadanie in list(stan.lista_zadan):
+                if zadanie.termin < datetime.now():
+                    stan.lista_zadan.remove(zadanie)
+
             return True
         except pickle.PickleError:
             print("Nie udało się wczytać pliku pickle!")
@@ -357,5 +363,10 @@ def main(token: str):
 if __name__ == '__main__':
     from sys import argv
     from os import environ
+
     # Token jest wczytywany ze zmiennej środowiskowej lub pierwszego argumentu podanego przy uruchamianiu
-    main(environ.get("SpisToken") or argv[1])
+    try:
+        main(environ.get("SpisToken") or argv[1])
+    except IndexError:
+        print('Nie udało się odnaleźć tokena!\n'
+              'Podaj go w argumencie do uruchomienia lub w zmiennej środowiskowej "SpisToken".')
