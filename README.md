@@ -7,16 +7,24 @@ Jest to bot służący do zarządzania i wyświetlania spisu zadań domowych na 
 
 ### Globalne
 
-> #### /spis \[statystyki_dla_nerdow: prawda|fałsz]
-![Wyświetla aktualny stan spisu](https://cdn.discordapp.com/attachments/931884001680031754/938163792209129522/unknown.png)
+> #### /spis \[dodatkowe_opcje: string]
+![Wyświetla aktualny stan spisu](https://cdn.discordapp.com/attachments/931884001680031754/938780030874583060/unknown.png)
 
 ### Dla edytorów
 
 > #### /dodaj_zadanie <opis: string> <termin: data|godzina> \[przedmiot: string]
-![Dodaje nowe zadanie do spisu](https://cdn.discordapp.com/attachments/931884001680031754/938164516062101534/unknown.png)
+![Dodaje nowe zadanie do spisu](https://cdn.discordapp.com/attachments/931884001680031754/938780752382918666/unknown.png)
 
 > #### /usun_zadanie <id: string>
 ![Usuwa zadanie o podanym ID ze spisu](https://cdn.discordapp.com/attachments/931884001680031754/938165033106538526/unknown.png)
+
+### Dla developera
+
+> #### /zapisz_stan
+![Zapisuje stan bota do pliku i wysyła go do twórcy bota](https://cdn.discordapp.com/attachments/931884001680031754/938781136576999535/unknown.png)
+
+> #### /wczytaj_stan
+![Wczytuje stan bota z kanału prywatnego twórcy bota (liczy się tylko ostatnia wiadomość)](https://cdn.discordapp.com/attachments/931884001680031754/938785280188620800/unknown.png)
 
 ## Format daty
 
