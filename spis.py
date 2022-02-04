@@ -111,7 +111,7 @@ class ZadanieDomowe:
     def stworz_task(self) -> tasks.Loop:
         """Tworzy task, którego celem jest usunięcie danego zadania domowego po upłynięciu jego terminu"""
 
-        termin = (self.termin - datetime.now()).total_seconds()
+        termin = (self.termin - datetime.now()).total_seconds() + 5  # 5 sekund później, just to be sure
 
         # Jeśli nie podano godziny przy tworzeniu zadania, usuń je dopiero o godzinie 23:59:30 danego dnia
         if self.termin.hour == 0 and self.termin.minute == 0:
@@ -120,12 +120,8 @@ class ZadanieDomowe:
         # Wykonaj 2 razy, raz po utworzeniu, raz po upłynięciu czasu
         @tasks.loop(seconds=termin, count=2)
         async def usun_zadanie_po_terminie():
-            pass
-
-        # Usuń zadanie dopiero po prawdziwym upłynięciu czasu
-        @usun_zadanie_po_terminie.after_loop
-        async def usun_after_loop():
-            bot.stan.lista_zadan.remove(self)
+            if self.termin < datetime.now():  # Upewnij się, że to już czas
+                bot.stan.lista_zadan.remove(self)
 
         usun_zadanie_po_terminie.start()  # Wystartuj task
         return usun_zadanie_po_terminie
