@@ -1,8 +1,8 @@
+import pickle
 from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
 from enum import Enum
 from functools import cache
-import pickle
 from io import BytesIO
 from typing import cast, Iterable, Any
 
@@ -125,7 +125,7 @@ class ZadanieDomowe:
         # Usuń zadanie dopiero po prawdziwym upłynięciu czasu
         @usun_zadanie_po_terminie.after_loop
         async def usun_after_loop():
-            stan.lista_zadan.remove(self)
+            bot.stan.lista_zadan.remove(self)
 
         usun_zadanie_po_terminie.start()  # Wystartuj task
         return usun_zadanie_po_terminie
@@ -163,51 +163,86 @@ class StanBota:
 
     lista_zadan: list[ZadanieDomowe] = field(default_factory=list)
 
-    @classmethod
-    async def zapisz(cls) -> bool:
+
+class SpisBot(discord.Bot):
+    """Rozszerzenie podstawowego bota o potrzebne metody"""
+
+    # do usunięcia przy aktualizacji pycorda, inaczej pycharm krzyczy
+    async def sync_commands(self) -> None:
+        pass
+    # do nowszego commita
+    # async def register_command(self, command: discord.ApplicationCommand, force: bool = True,
+    #                            guild_ids: List[int] = None) -> None:
+    #     """Musiałem to zaimplementować, bo nie chciało się tego zrobić twórcom pycorda..."""
+    #     for guild in guild_ids:
+    #         await self.register_commands([command], guild, force)
+
+    def __init__(self, *args, **kwargs):
+        """Inicjalizacja zmiennych"""
+        super().__init__(*args, **kwargs)
+
+        self.backup_kanal: discord.DMChannel | None = None  # Kanał do zapisywania/backupowania/wczytywania stanu spisu
+        self.stan: StanBota | None = None
+
+    async def zapisz(self) -> bool:
         """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
         try:
-            backup = pickle.dumps(stan, pickle.HIGHEST_PROTOCOL)
+            backup = pickle.dumps(self.stan, pickle.HIGHEST_PROTOCOL)
             plik = discord.File(BytesIO(backup), f"spis_backup_{int(datetime.now().timestamp())}.pickle")
-            await storage.send("", file=plik)
+            await self.backup_kanal.send("", file=plik)
             return True
         except pickle.PickleError:
             print("Nie udało się zapisać obiektu jako pickle!")
             return False
 
-    @classmethod
-    async def wczytaj(cls) -> bool:
+    async def wczytaj(self) -> bool:
         """Wczytuje stan bota z kanału prywatnego twórcy bota"""
         try:
-            ostatnia_wiadomosc = (await storage.history(limit=1).flatten())[0]
+            ostatnia_wiadomosc = (await self.backup_kanal.history(limit=1).flatten())[0]
             if len(ostatnia_wiadomosc.attachments) != 1:
                 return False
             dane = await ostatnia_wiadomosc.attachments[0].read()
-            global stan
-            stan = pickle.loads(dane, fix_imports=False)
+            self.stan = pickle.loads(dane, fix_imports=False)
 
             # Usuń zadania z przeszłości
-            for zadanie in list(stan.lista_zadan):
+            for zadanie in list(self.stan.lista_zadan):
                 if zadanie.termin < datetime.now():
-                    stan.lista_zadan.remove(zadanie)
+                    self.stan.lista_zadan.remove(zadanie)
 
             return True
         except pickle.PickleError:
             print("Nie udało się wczytać pliku pickle!")
             return False
 
+    async def on_ready(self):
+        """Wykonywane przy starcie bota"""
+        print(f"Zalogowano jako {self.user}!")
 
-stan: StanBota
+        # Inicjalizacja kanału przechowywania backupu i próba wczytania
+        wlasciciel = (await self.application_info()).owner
+        self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
+        if await self.wczytaj():
+            print("Pomyślnie wczytano backup!")
+        else:
+            self.stan = StanBota()  # Stwórz stan bota, jeśli nie istnieje
+
+    async def close(self):
+        """Zamyka bota zapisując jego stan"""
+        print(f"Zapisanie stanu{'' if await self.zapisz() else ' nie'} powiodło się!")
+        await super().close()
+
+# ------------------------- ZMIENNE GLOBALNE
+
+
 PDP_INSTANCE = PolskiDateParser()
-bot = discord.Bot()
-storage: discord.DMChannel  # Kanał do zapisywania/backupowania/wczytywania stanu spisu
+bot = SpisBot()
 
 # ------------------------- STYLE
 
 
 def _sorted_spis() -> list[ZadanieDomowe]:
     """Skrót do sorted(lista_zadan), bo PyCharm twierdzi, że przekazuję zły typ danych..."""
-    return sorted(cast(Iterable, stan.lista_zadan))
+    return sorted(cast(Iterable, bot.stan.lista_zadan))
 
 
 def oryginalny(dev: bool) -> dict[str, Any]:
@@ -270,7 +305,7 @@ async def dodaj_zadanie(
 
     # Tworzy obiekt zadania i dodaje do spisu
     nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis)
-    stan.lista_zadan.append(nowe_zadanie)
+    bot.stan.lista_zadan.append(nowe_zadanie)
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
 
 
@@ -284,7 +319,7 @@ async def usun_zadanie(
 
     id_zadania = id_zadania.lower()
     znaleziono = None
-    for zadanie in stan.lista_zadan:
+    for zadanie in bot.stan.lista_zadan:
         if zadanie.id == id_zadania:
             znaleziono = zadanie
             break
@@ -294,7 +329,7 @@ async def usun_zadanie(
         return
 
     znaleziono.task.cancel()
-    stan.lista_zadan.remove(znaleziono)
+    bot.stan.lista_zadan.remove(znaleziono)
     await ctx.respond("Usunięto zadanie!")
 
 
@@ -324,8 +359,8 @@ async def spis(
 async def zapisz_stan(ctx: commands.ApplicationContext):
     """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
 
-    sukces = await StanBota.zapisz()
-    await ctx.respond(f"Zapisywanie{'' if sukces else ' nie'} powiodło się!", ephemeral=True)
+    sukces = await bot.zapisz()
+    await ctx.respond(f"Zapisanie się{'' if sukces else ' nie'} powiodło!", ephemeral=True)
 
 
 @bot.slash_command(guild_ids=[DEV[1]], default_permission=False)
@@ -333,26 +368,10 @@ async def zapisz_stan(ctx: commands.ApplicationContext):
 async def wczytaj_stan(ctx: commands.ApplicationContext):
     """Wczytuje stan bota z kanału prywatnego twórcy bota (liczy się tylko ostatnia wiadomość)"""
 
-    sukces = await StanBota.wczytaj()
-    await ctx.respond(f"Wczytywanie{'' if sukces else ' nie'} powiodło się!", ephemeral=True)
+    sukces = await bot.wczytaj()
+    await ctx.respond(f"Wczytanie się{'' if sukces else ' nie'} powiodło!", ephemeral=True)
 
 # ------------------------- START BOTA
-
-
-@bot.event
-async def on_ready():
-    """Wykonywane przy starcie bota"""
-    print(f"Zalogowano jako {bot.user}!")
-
-    # Inicjalizacja kanału przechowywania backupu i próba wczytania
-    global storage
-    owner = (await bot.application_info()).owner
-    storage = owner.dm_channel or await owner.create_dm()
-    if await StanBota.wczytaj():
-        print("Pomyślnie wczytano backup!")
-    else:
-        global stan
-        stan = StanBota()  # Stwórz stan bota, jeśli nie istnieje
 
 
 def main(token: str):
