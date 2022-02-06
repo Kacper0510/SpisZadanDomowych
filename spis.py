@@ -4,16 +4,18 @@ from datetime import datetime, date, timedelta
 from enum import Enum
 from functools import cache
 from io import BytesIO
-from typing import cast, Iterable, Any, List
+from typing import cast, Any, List
 
 import discord
 from dateutil import parser
 from discord import commands  # uwaga, zwykłe commands, nie discord.ext.commands
 from discord.ext import tasks
+from sortedcontainers import SortedList
 
 # ------------------------- STAŁE
 
 # Format: ID roli, ID serwera
+
 EDYTOR = 931891996577103892, 885830592665628702
 DEV = 938146467749707826, 885830592665628702
 
@@ -157,7 +159,7 @@ class ZadanieDomowe:
 class StanBota:
     """Klasa przechowująca stan bota między uruchomieniami"""
 
-    lista_zadan: list[ZadanieDomowe] = field(default_factory=list)
+    lista_zadan: SortedList[ZadanieDomowe] = field(default_factory=SortedList)
 
 
 class SpisBot(discord.Bot):
@@ -232,17 +234,12 @@ bot = SpisBot()
 # ------------------------- STYLE
 
 
-def _sorted_spis() -> list[ZadanieDomowe]:
-    """Skrót do sorted(lista_zadan), bo PyCharm twierdzi, że przekazuję zły typ danych..."""
-    return sorted(cast(Iterable, bot.stan.lista_zadan))
-
-
 def oryginalny(dev: bool) -> dict[str, Any]:
     """Oryginalny styl spisu jeszcze sprzed istnienia tego bota (domyślne)"""
 
     wiadomosc = ""
     dzien = date.today() - timedelta(days=1)  # Wczoraj
-    for zadanie in _sorted_spis():
+    for zadanie in bot.stan.lista_zadan:
         # Wyświetlanie dni
         if (data_zadania := zadanie.termin.date()) > dzien:
             wiadomosc += f"\n{PDP_INSTANCE.WEEKDAYS[data_zadania.weekday()][1].capitalize()}, " \
@@ -264,7 +261,9 @@ def oryginalny(dev: bool) -> dict[str, Any]:
 
 def pythonowe_repr(dev: bool) -> dict[str, Any]:
     """Lista wywołań Pythonowego repr() na każdym zadaniu domowym"""
-    return {"content": "\n".join([(f'{zadanie.id}: ' if dev else '') + repr(zadanie) for zadanie in _sorted_spis()])}
+    return {"content": "\n".join(
+        [(f'{zadanie.id}: ' if dev else '') + repr(zadanie) for zadanie in bot.stan.lista_zadan]
+    )}
 
 # ------------------------- KOMENDY
 
@@ -298,7 +297,7 @@ async def dodaj_zadanie(
 
     # Tworzy obiekt zadania i dodaje do spisu
     nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis)
-    bot.stan.lista_zadan.append(nowe_zadanie)
+    bot.stan.lista_zadan.add(nowe_zadanie)
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
 
 
