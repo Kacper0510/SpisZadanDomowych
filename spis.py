@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from enum import Enum
 from functools import cache
 from io import BytesIO
-from typing import cast, Iterable, Any
+from typing import cast, Iterable, Any, List
 
 import discord
 from dateutil import parser
@@ -163,15 +163,11 @@ class StanBota:
 class SpisBot(discord.Bot):
     """Rozszerzenie podstawowego bota o potrzebne metody"""
 
-    # do usunięcia przy aktualizacji pycorda, inaczej pycharm krzyczy
-    async def sync_commands(self) -> None:
-        pass
-    # do nowszego commita
-    # async def register_command(self, command: discord.ApplicationCommand, force: bool = True,
-    #                            guild_ids: List[int] = None) -> None:
-    #     """Musiałem to zaimplementować, bo nie chciało się tego zrobić twórcom pycorda..."""
-    #     for guild in guild_ids:
-    #         await self.register_commands([command], guild, force)
+    async def register_command(self, command: discord.ApplicationCommand, force: bool = True,
+                               guild_ids: List[int] = None) -> None:
+        """Musiałem to zaimplementować, bo nie chciało się tego zrobić twórcom pycorda..."""
+        for guild in guild_ids:
+            await self.register_commands([command], guild, force)
 
     def __init__(self, *args, **kwargs):
         """Inicjalizacja zmiennych"""
@@ -206,7 +202,7 @@ class SpisBot(discord.Bot):
                     self.stan.lista_zadan.remove(zadanie)
 
             return True
-        except pickle.PickleError:
+        except pickle.PickleError | IndexError:
             print("Nie udało się wczytać pliku pickle!")
             return False
 

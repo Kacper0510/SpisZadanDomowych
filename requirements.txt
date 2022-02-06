@@ -1,2 +1,2 @@
 python-dateutil>=2.8.2
-git+https://github.com/Pycord-Development/pycord.git@4f39a974d0e15219681c077011359169d0c2e9b9
+git+https://github.com/Pycord-Development/pycord.git@704fb2e298a005e26bd294a891ec507ebbf3ee29
