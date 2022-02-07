@@ -2,7 +2,7 @@ import pickle
 from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
 from enum import Enum
-from functools import cache
+from functools import cache, total_ordering
 from io import BytesIO
 from typing import cast, Iterable, Any, List
 
@@ -53,13 +53,14 @@ class PolskiDateParser(parser.parserinfo):
         super().__init__(True, False)
 
 
+@total_ordering
 class Przedmioty(Enum):
     """Enumeracja wszystkich przedmiotów szkolnych.
     Pierwszy string w wartości danego przedmiotu jest jego nazwą, drugi - ogólnodostępnym emoji (np. flagą),
     a pozostałe - customowymi emoji, np. z twarzą nauczyciela."""
 
-    ANGIELSKI = "Język angielski", "🇬🇧"
-    POLSKI = "Język polski", "🇵🇱"
+    ANGIELSKI = "Angielski", "🇬🇧"
+    POLSKI = "Polski", "🇵🇱"
     MATEMATYKA = "Matematyka", "🧮", "📏"
     RELIGIA = "Religia", "✝"
     MATMA_UZUP = "Matematyka uzupełniająca", "🔢", "🔠"
@@ -81,6 +82,10 @@ class Przedmioty(Enum):
     def __reduce_ex__(self, protocol):
         """Pozwala na skuteczniejsze pamięciowo picklowanie przedmiotów poprzez zapamiętanie tylko nazwy"""
         return getattr, (self.__class__, self.name)
+
+    def __lt__(self, inny):
+        """Przedmiot jest mniejszy od drugiego, gdy jego nazwa alfabetycznie jest mniejsza"""
+        return self.nazwa < inny.nazwa
 
     @property
     def nazwa(self) -> str:
