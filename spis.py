@@ -7,8 +7,9 @@ from io import BytesIO
 from typing import cast, Iterable, Any, List
 
 import discord
-from dateutil import parser
-from discord import commands  # uwaga, zwykłe commands, nie discord.ext.commands
+from dateutil.parser import parserinfo, ParserError, parser
+from dateutil.relativedelta import relativedelta
+from discord import commands  # Uwaga, zwykłe commands, nie discord.ext.commands
 from discord.ext import tasks
 
 # ------------------------- STAŁE
@@ -20,8 +21,8 @@ DEV = 938146467749707826, 885830592665628702
 # ------------------------- STRUKTURY DANYCH
 
 
-class PolskiDateParser(parser.parserinfo):
-    """Klasa rozszerzająca parserinfo z dateutil.
+class PolskiDateParser(parserinfo, parser):
+    """Klasa rozszerzająca parser i przy okazji parserinfo z dateutil.
     Pozwala ona na wprowadzanie dat w polskim formacie."""
 
     MONTHS = [
@@ -50,7 +51,35 @@ class PolskiDateParser(parser.parserinfo):
     ]
 
     def __init__(self):
-        super().__init__(True, False)
+        parserinfo.__init__(self, True, False)  # Poprawne ustawienie formatu DD.MM.RR
+        parser.__init__(self, self)  # Ustawienie parserinfo na self
+
+    # noinspection PyMethodMayBeStatic
+    def _build_naive(self, res, default: datetime):
+        """Nadpisane, aby naprawić problem z datami w przeszłości"""
+        replacement = {}
+        for attr in ("year", "month", "day", "hour", "minute", "second", "microsecond"):
+            if (v := getattr(res, attr)) is not None:  # Note to self: nie zapominać o nawiasie w walrusie
+                replacement[attr] = v
+
+        default = default.replace(**replacement)
+        now = datetime.now()
+
+        if res.weekday is not None:
+            if res.day is None:
+                default += timedelta(days=1)  # Nie pozwalamy na zwrócenie dzisiaj
+            # Znajduje następny oczekiwany przez użytkownika dzień tygodnia
+            default += timedelta(days=(res.weekday + 7 - default.weekday()) % 7)
+
+        if default < now:  # Naprawa błędu z datą w przeszłości zamiast z najbliższą datą
+            if res.hour is not None and res.day is None and res.weekday is None:
+                default += timedelta(days=1)
+            elif res.day is not None and res.month is None:
+                default += relativedelta(months=1)
+            elif res.month is not None and res.year is None:
+                default += relativedelta(years=1)
+
+        return default
 
 
 @total_ordering
@@ -293,11 +322,11 @@ async def dodaj_zadanie(
     """Dodaje nowe zadanie do spisu"""
 
     try:
-        data = parser.parse(termin, PDP_INSTANCE)  # Konwertuje datę/godzinę podaną przez użytkownika na datetime
+        data = PDP_INSTANCE.parse(termin)  # Konwertuje datę/godzinę podaną przez użytkownika na datetime
         if data < datetime.now():
             await ctx.respond("Zadanie nie zostało zarejestrowane, ponieważ podano datę z przeszłości!")
             return
-    except (parser.ParserError, ValueError):
+    except (ParserError, ValueError):
         await ctx.respond("Wystąpił błąd przy konwersji daty!")
         return
 
