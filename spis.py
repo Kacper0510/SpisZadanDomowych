@@ -156,6 +156,8 @@ class ZadanieDomowe:
     termin: datetime
     przedmiot: Przedmioty
     tresc: str
+    utworzono: tuple[int, datetime]  # Zawiera ID autora i datę utworzenia
+    id: str = field(hash=False)
     task: tasks.Loop = field(hash=False, compare=False, repr=False)
 
     def stworz_task(self) -> tasks.Loop:
@@ -176,31 +178,27 @@ class ZadanieDomowe:
         usun_zadanie_po_terminie.start()  # Wystartuj task
         return usun_zadanie_po_terminie
 
-    def __init__(self, termin, przedmiot, tresc):
+    def __init__(self, termin, przedmiot, tresc, autor: discord.User):
         """Inicjalizuje zadanie domowe i tworzy task do jego usunięcia"""
         self.tresc = tresc
         self.termin = termin
         self.przedmiot = przedmiot
+        self.utworzono = autor.id, datetime.now()
+        self.id = hex(abs(hash(self)))[2:]
         self.task = self.stworz_task()
 
     def __del__(self):
-        """Przy destrukcji obiektu kończy też task"""
+        """Przy destrukcji obiektu anuluje jego task"""
         self.task.cancel()
 
     def __getstate__(self) -> tuple:
         """Zapisuje w pickle wszystkie dane zadania domowego oprócz taska"""
-        return self.termin, self.przedmiot, self.tresc
+        return self.termin, self.przedmiot, self.tresc, self.utworzono, self.id
 
     def __setstate__(self, state: tuple):
         """Wczytuje stan obiektu z pickle"""
-        self.termin, self.przedmiot, self.tresc = state
+        self.termin, self.przedmiot, self.tresc, self.utworzono, self.id = state
         self.task = self.stworz_task()
-
-    @property
-    @cache
-    def id(self):
-        """Zwraca ID zadania, generowane na podstawie hasha zamienionego na system szesnastkowy"""
-        return hex(abs(hash(self)))[2:]
 
 
 @dataclass
@@ -287,6 +285,7 @@ bot = SpisBot()
 # ------------------------- STYLE
 
 
+# Style i tak będą przepisane
 def oryginalny(dev: bool) -> dict[str, Any]:
     """Oryginalny styl spisu jeszcze sprzed istnienia tego bota (domyślne)"""
 
@@ -312,10 +311,10 @@ def oryginalny(dev: bool) -> dict[str, Any]:
     return {"content": wiadomosc.strip()}
 
 
-def pythonowe_repr(dev: bool) -> dict[str, Any]:
+def pythonowe_repr(_dev: bool) -> dict[str, Any]:
     """Lista wywołań Pythonowego repr() na każdym zadaniu domowym"""
     return {"content": "\n".join(
-        [(f'{zadanie.id}: ' if dev else '') + repr(zadanie) for zadanie in bot.stan.lista_zadan]
+        [repr(zadanie) for zadanie in bot.stan.lista_zadan]
     )}
 
 # ------------------------- KOMENDY
@@ -339,6 +338,9 @@ async def dodaj_zadanie(
 ):
     """Dodaje nowe zadanie do spisu"""
 
+    if len(opis) > 400:
+        await ctx.respond("Za długa treść zadania!\nLimit znaków: 400")
+        return
     try:
         data = PDP_INSTANCE.parse(termin)  # Konwertuje datę/godzinę podaną przez użytkownika na datetime
         if data < datetime.now():
@@ -349,7 +351,7 @@ async def dodaj_zadanie(
         return
 
     # Tworzy obiekt zadania i dodaje do spisu
-    nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis)
+    nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis, ctx.author)
     bot.stan.lista_zadan.add(nowe_zadanie)
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
 
@@ -390,7 +392,7 @@ async def spis(
 ):
     """Wyświetla aktualny stan spisu"""
 
-    styl = oryginalny
+    styl = pythonowe_repr
     wynik = styl(dodatkowe_opcje == "Statystyki dla nerdów")
     if len(wynik) == 1 and "content" in wynik and not wynik["content"]:
         await ctx.respond("Spis jest aktualnie pusty!",
