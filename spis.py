@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 from enum import Enum
 from functools import cache, total_ordering
 from io import BytesIO
+from os import getenv
 from typing import cast, Iterable, Any, List
 
 import discord
@@ -12,11 +13,25 @@ from dateutil.relativedelta import relativedelta
 from discord import commands  # Uwaga, zwykłe commands, nie discord.ext.commands
 from discord.ext import tasks
 
+
 # ------------------------- STAŁE
 
-# Format: ID roli, ID serwera
-EDYTOR = 931891996577103892, 885830592665628702
-DEV = 938146467749707826, 885830592665628702
+
+def _wczytaj_role_z_env(nazwa: str):
+    """Wczytuje dane o roli z os.environ.
+    Format: <id_roli>:<id_serwera>"""
+    try:
+        s = getenv(f"Spis_{nazwa}")
+        if not s:
+            return None, None
+        s = s.split(":")
+        return tuple(map(int, s))
+    except IndexError:
+        return None, None
+
+
+EDYTOR = _wczytaj_role_z_env("Edytor")
+DEV = _wczytaj_role_z_env("Dev")
 
 # ------------------------- STRUKTURY DANYCH
 
@@ -209,6 +224,7 @@ class SpisBot(discord.Bot):
 
         self.backup_kanal: discord.DMChannel | None = None  # Kanał do zapisywania/backupowania/wczytywania stanu spisu
         self.stan: StanBota | None = None
+        self.autosave = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
 
     async def zapisz(self) -> bool:
         """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
@@ -244,17 +260,21 @@ class SpisBot(discord.Bot):
         """Wykonywane przy starcie bota"""
         print(f"Zalogowano jako {self.user}!")
 
-        # Inicjalizacja kanału przechowywania backupu i próba wczytania
-        wlasciciel = (await self.application_info()).owner
-        self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
-        if await self.wczytaj():
-            print("Pomyślnie wczytano backup!")
+        if self.autosave:
+            # Inicjalizacja kanału przechowywania backupu i próba wczytania
+            wlasciciel = (await self.application_info()).owner
+            self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
+            if await self.wczytaj():
+                print("Pomyślnie wczytano backup!")
+            else:
+                self.stan = StanBota()
         else:
-            self.stan = StanBota()  # Stwórz stan bota, jeśli nie istnieje
+            self.stan = StanBota()
 
     async def close(self):
         """Zamyka bota zapisując jego stan"""
-        print(f"Zapisanie stanu{'' if await self.zapisz() else ' nie'} powiodło się!")
+        if self.autosave:
+            print(f"Zapisanie stanu{'' if await self.zapisz() else ' nie'} powiodło się!")
         await super().close()
 
 # ------------------------- ZMIENNE GLOBALNE
@@ -401,18 +421,16 @@ async def wczytaj_stan(ctx: commands.ApplicationContext):
 # ------------------------- START BOTA
 
 
-def main(token: str):
-    """Startuje bota zajmującego się spisem zadań domowych"""
+def main():
+    """Startuje bota zajmującego się spisem zadań domowych, wczytując token z os.environ"""
+    token = getenv("Spis_Token")
+    if not token:
+        print('Nie udało się odnaleźć tokena!\nUpewnij się, że podano go w zmiennej środowiskowej "Spis_Token".')
+        return
+
+    bot.autosave = getenv("Spis_Autosave", "t").lower() in ("true", "t", "yes", "y", "1", "on", "prawda", "p", "tak")
     bot.run(token)
 
 
 if __name__ == '__main__':
-    from sys import argv
-    from os import environ
-
-    # Token jest wczytywany ze zmiennej środowiskowej lub pierwszego argumentu podanego przy uruchamianiu
-    try:
-        main(environ.get("SpisToken") or argv[1])
-    except IndexError:
-        print('Nie udało się odnaleźć tokena!\n'
-              'Podaj go w argumencie do uruchomienia lub w zmiennej środowiskowej "SpisToken".')
+    main()
