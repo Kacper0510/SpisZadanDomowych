@@ -31,22 +31,27 @@ $ python3 spis.py
 ### Globalne
 
 > **/spis** [dodatkowe_opcje: string do wyboru (domyślnie: Brak)]
+
 ![Wyświetla aktualny stan spisu](https://cdn.discordapp.com/attachments/931884001680031754/938780030874583060/unknown.png)
 
 ### Dla edytorów
 
 > **/dodaj_zadanie <opis: string> <termin: data|godzina|dzień tygodnia>** [przedmiot: string do wyboru (domyślnie: Inny)]
+
 ![Dodaje nowe zadanie do spisu](https://cdn.discordapp.com/attachments/931884001680031754/938780752382918666/unknown.png)
 
 > **/usun_zadanie <id: liczba w formacie szesnastkowym>**
+
 ![Usuwa zadanie o podanym ID ze spisu](https://cdn.discordapp.com/attachments/931884001680031754/938165033106538526/unknown.png)
 
 ### Dla developera
 
 > **/zapisz_stan**
+
 ![Zapisuje stan bota do pliku i wysyła go do twórcy bota](https://cdn.discordapp.com/attachments/931884001680031754/938781136576999535/unknown.png)
 
 > **/wczytaj_stan**
+
 ![Wczytuje stan bota z kanału prywatnego twórcy bota (liczy się tylko ostatnia wiadomość)](https://cdn.discordapp.com/attachments/931884001680031754/938785280188620800/unknown.png)
 
 ## Format daty
