@@ -1,4 +1,5 @@
 import pickle
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
 from enum import Enum
@@ -148,6 +149,12 @@ class Przedmioty(Enum):
         return {cast(str, p.nazwa): p for p in cls}
 
 
+# Regex do znajdowania wszystkich linków w treści zadania
+LINK_REGEX = re.compile(
+    r"(https?://[a-zA-Z0-9-._~:/?#\[\]@!$&'()*+,;=%]*[a-zA-Z0-9-_~:/?#\[\]@!$&'()*+;=%])"
+)
+
+
 @dataclass(order=True, unsafe_hash=True)
 class ZadanieDomowe:
     """Reprezentuje jedno zadanie domowe"""
@@ -156,6 +163,13 @@ class ZadanieDomowe:
     przedmiot: Przedmioty
     tresc: str
     task: tasks.Loop = field(hash=False, compare=False, repr=False)
+
+    @staticmethod
+    def popraw_linki(tekst: str) -> str:
+        """Poprawia podany tekst tak, aby linki nie generowały poglądów przy wypisywaniu spisu.
+        Zasada działania: gdy link znajduje się w nawiasach ostrokątnych, nie generuje on embedów."""
+        # \1 oznacza backtracking do 1 grupy każdego matcha, czyli do całego linku
+        return LINK_REGEX.sub(r"<\1>", tekst)
 
     def stworz_task(self) -> tasks.Loop:
         """Tworzy task, którego celem jest usunięcie danego zadania domowego po upłynięciu jego terminu"""
@@ -177,7 +191,7 @@ class ZadanieDomowe:
 
     def __init__(self, termin, przedmiot, tresc):
         """Inicjalizuje zadanie domowe i tworzy task do jego usunięcia"""
-        self.tresc = tresc
+        self.tresc = self.popraw_linki(tresc)
         self.termin = termin
         self.przedmiot = przedmiot
         self.task = self.stworz_task()
@@ -260,11 +274,11 @@ class SpisBot(discord.Bot):
         """Wykonywane przy starcie bota"""
         print(f"Zalogowano jako {self.user}!")
 
+        # Inicjalizacja kanału przechowywania backupu
+        wlasciciel = (await self.application_info()).owner
+        self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
         if self.autosave:
-            # Inicjalizacja kanału przechowywania backupu i próba wczytania
-            wlasciciel = (await self.application_info()).owner
-            self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
-            if await self.wczytaj():
+            if await self.wczytaj():  # Próba wczytania
                 print("Pomyślnie wczytano backup!")
             else:
                 self.stan = StanBota()
