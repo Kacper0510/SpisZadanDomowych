@@ -1,10 +1,13 @@
+import logging
 import pickle
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
 from enum import Enum
 from functools import cache, total_ordering
 from io import BytesIO
 from os import getenv
+from sys import stdout
 from typing import cast, Any, List
 
 import discord
@@ -14,6 +17,17 @@ from discord import commands  # Uwaga, zwykłe commands, nie discord.ext.command
 from discord.ext import tasks
 from sortedcontainers import SortedList
 
+# ------------------------- LOGGING
+
+logger = logging.getLogger("spis")
+LOGGER_FORMAT_DATY = "%d.%m.%y %H:%M:%S"
+logging.basicConfig(
+    level=getenv("Spis_LogLevel", "INFO").upper(),  # Poziom logowania
+    style="{",
+    format="[{asctime} {levelname} {name}/{funcName}] {message}",  # Format logów
+    datefmt=LOGGER_FORMAT_DATY,  # Format daty
+    stream=stdout  # Miejsce logowania: standardowe wyjście
+)
 
 # ------------------------- STAŁE
 
@@ -24,10 +38,14 @@ def _wczytaj_role_z_env(nazwa: str):
     try:
         s = getenv(f"Spis_{nazwa}")
         if not s:
+            logger.warning(f"Nie ustawiono zmiennej środowiskowej Spis_{nazwa}! Takie zachowanie nie było testowane!")
             return None, None
         s = s.split(":")
-        return tuple(map(int, s))
+        ret = tuple(map(int, s))
+        logger.debug(f"Wczytano zmienną środowiskową Spis_{nazwa}: {ret}")
+        return ret
     except IndexError:
+        logger.warning(f"Zmienną środowiskową Spis_{nazwa} podano w złym formacie!")
         return None, None
 
 
@@ -73,6 +91,7 @@ class PolskiDateParser(parserinfo, parser):
     # noinspection PyMethodMayBeStatic
     def _build_naive(self, res, default: datetime):
         """Nadpisane, aby naprawić problem z datami w przeszłości"""
+        logging.debug(f"Parsowanie daty - surowe dane: {res}")
         replacement = {}
         for attr in ("year", "month", "day", "hour", "minute", "second", "microsecond"):
             if (v := getattr(res, attr)) is not None:  # Note to self: nie zapominać o nawiasie w walrusie
@@ -95,6 +114,7 @@ class PolskiDateParser(parserinfo, parser):
             elif res.month is not None and res.year is None:
                 default += relativedelta(years=1)
 
+        logging.debug(f"Parsowanie daty - wynik: {default}")
         return default
 
 
@@ -149,6 +169,12 @@ class Przedmioty(Enum):
         return {cast(str, p.nazwa): p for p in cls}
 
 
+# Regex do znajdowania wszystkich linków w treści zadania
+LINK_REGEX = re.compile(
+    r"(https?://[a-zA-Z0-9-._~:/?#\[\]@!$&'()*+,;=%]*[a-zA-Z0-9-_~:/?#\[\]@!$&'()*+;=%])"
+)
+
+
 @dataclass(order=True, unsafe_hash=True)
 class ZadanieDomowe:
     """Reprezentuje jedno zadanie domowe"""
@@ -159,6 +185,15 @@ class ZadanieDomowe:
     utworzono: tuple[int, datetime]  # Zawiera ID autora i datę utworzenia
     id: str = field(hash=False)
     task: tasks.Loop = field(hash=False, compare=False, repr=False)
+
+    @staticmethod
+    def popraw_linki(tekst: str) -> str:
+        """Poprawia podany tekst tak, aby linki nie generowały poglądów przy wypisywaniu spisu.
+        Zasada działania: gdy link znajduje się w nawiasach ostrokątnych, nie generuje on embedów."""
+        # \1 oznacza backtracking do 1 grupy każdego matcha, czyli do całego linku
+        ret = LINK_REGEX.sub(r"<\1>", tekst)
+        logger.debug(f'Poprawianie linków: {repr(tekst)} na {repr(ret)}')
+        return ret
 
     def stworz_task(self) -> tasks.Loop:
         """Tworzy task, którego celem jest usunięcie danego zadania domowego po upłynięciu jego terminu"""
@@ -180,7 +215,7 @@ class ZadanieDomowe:
 
     def __init__(self, termin, przedmiot, tresc, autor: discord.User):
         """Inicjalizuje zadanie domowe i tworzy task do jego usunięcia"""
-        self.tresc = tresc
+        self.tresc = self.popraw_linki(tresc)
         self.termin = termin
         self.przedmiot = przedmiot
         self.utworzono = autor.id, datetime.now()
@@ -225,23 +260,25 @@ class SpisBot(discord.Bot):
         self.stan: StanBota | None = None
         self.autosave = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
 
-    async def zapisz(self) -> bool:
+    async def zapisz(self) -> None:
         """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
         try:
             backup = pickle.dumps(self.stan, pickle.HIGHEST_PROTOCOL)
             plik = discord.File(BytesIO(backup), f"spis_backup_{int(datetime.now().timestamp())}.pickle")
             await self.backup_kanal.send("", file=plik)
-            return True
-        except pickle.PickleError:
-            print("Nie udało się zapisać obiektu jako pickle!")
-            return False
+            logger.info(f"Pomyślnie zapisano plik {plik.filename} na kanale {repr(self.backup_kanal)}")
+            logger.debug(f"Zapisane dane: {repr(self.stan)}")
+        except pickle.PickleError as e:
+            logger.exception("Nie udało się zapisać stanu jako obiekt pickle!", exc_info=e)
 
-    async def wczytaj(self) -> bool:
+    async def wczytaj(self) -> None:
         """Wczytuje stan bota z kanału prywatnego twórcy bota"""
         try:
             ostatnia_wiadomosc = (await self.backup_kanal.history(limit=1).flatten())[0]
             if len(ostatnia_wiadomosc.attachments) != 1:
-                return False
+                logger.warning(f"Ostatnia wiadomość na kanale {repr(self.backup_kanal)} miała złą ilość załączników, "
+                               f"porzucono wczytywanie stanu!")
+                return
             dane = await ostatnia_wiadomosc.attachments[0].read()
             self.stan = pickle.loads(dane, fix_imports=False)
 
@@ -250,36 +287,41 @@ class SpisBot(discord.Bot):
                 if zadanie.termin < datetime.now():
                     self.stan.lista_zadan.remove(zadanie)
 
-            return True
-        except pickle.PickleError | IndexError:
-            print("Nie udało się wczytać pliku pickle!")
-            return False
+            # Wczytanie czasu, skąd pochodzi backup
+            try:
+                czas_backupu = datetime.fromtimestamp(int(ostatnia_wiadomosc.attachments[0].filename[12:-7]))
+            except (OSError, ValueError):  # Błąd parsowania
+                czas_backupu = ostatnia_wiadomosc.created_at
+
+            logger.info(f"Pomyślnie wczytano backup z {czas_backupu.strftime(LOGGER_FORMAT_DATY)} "
+                        f"z kanału {repr(self.backup_kanal)}")
+            logger.debug(f"Zapisane dane: {repr(self.stan)}")
+        except (pickle.PickleError, IndexError) as e:
+            logger.exception("Nie udało się wczytać pliku pickle!", exc_info=e)
+            self.stan = StanBota()
 
     async def on_ready(self):
         """Wykonywane przy starcie bota"""
-        print(f"Zalogowano jako {self.user}!")
+        logger.info(f"Zalogowano jako {self.user}!")
 
+        # Inicjalizacja kanału przechowywania backupu
+        wlasciciel = (await self.application_info()).owner
+        self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
         if self.autosave:
-            # Inicjalizacja kanału przechowywania backupu i próba wczytania
-            wlasciciel = (await self.application_info()).owner
-            self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
-            if await self.wczytaj():
-                print("Pomyślnie wczytano backup!")
-            else:
-                self.stan = StanBota()
+            await self.wczytaj()  # Próba wczytania
         else:
             self.stan = StanBota()
 
     async def close(self):
         """Zamyka bota zapisując jego stan"""
         if self.autosave:
-            print(f"Zapisanie stanu{'' if await self.zapisz() else ' nie'} powiodło się!")
+            await self.zapisz()  # Próba zapisu
         await super().close()
 
 # ------------------------- ZMIENNE GLOBALNE
 
 
-PDP_INSTANCE = PolskiDateParser()
+PDP = PolskiDateParser()  # Globalna instancja klasy PolskiDateParser
 bot = SpisBot()
 
 # ------------------------- STYLE
@@ -294,8 +336,8 @@ def oryginalny(dev: bool) -> dict[str, Any]:
     for zadanie in bot.stan.lista_zadan:
         # Wyświetlanie dni
         if (data_zadania := zadanie.termin.date()) > dzien:
-            wiadomosc += f"\n{PDP_INSTANCE.WEEKDAYS[data_zadania.weekday()][1].capitalize()}, " \
-                         f"{data_zadania.day} {PDP_INSTANCE.MONTHS[data_zadania.month - 1][1]}" \
+            wiadomosc += f"\n{PDP.WEEKDAYS[data_zadania.weekday()][1].capitalize()}, " \
+                         f"{data_zadania.day} {PDP.MONTHS[data_zadania.month - 1][1]}" \
                          f"{f' {rok}' if (rok := data_zadania.year) != date.today().year else ''}:\n"
             dzien = data_zadania
 
@@ -342,17 +384,21 @@ async def dodaj_zadanie(
         await ctx.respond("Za długa treść zadania!\nLimit znaków: 400")
         return
     try:
-        data = PDP_INSTANCE.parse(termin)  # Konwertuje datę/godzinę podaną przez użytkownika na datetime
+        data = PDP.parse(termin)  # Konwertuje datę/godzinę podaną przez użytkownika na datetime
         if data < datetime.now():
+            logger.debug(f'Użytkownik {repr(ctx.author)} podał datę z przeszłości: '
+                         f'{repr(termin)} -> {data.strftime(LOGGER_FORMAT_DATY)}')
             await ctx.respond("Zadanie nie zostało zarejestrowane, ponieważ podano datę z przeszłości!")
             return
-    except (ParserError, ValueError):
+    except (ParserError, ValueError) as e:
+        logger.debug(f'Użytkownik {repr(ctx.author)} podał datę w niepoprawnym formacie: {repr(termin)}', exc_info=e)
         await ctx.respond("Wystąpił błąd przy konwersji daty!")
         return
 
     # Tworzy obiekt zadania i dodaje do spisu
     nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis, ctx.author)
     bot.stan.lista_zadan.add(nowe_zadanie)
+    logger.info(f"Dodano nowe zadanie: {repr(nowe_zadanie)}")
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
 
 
@@ -372,11 +418,13 @@ async def usun_zadanie(
             break
 
     if not znaleziono:
+        logger.debug(f'Użytkownik {repr(ctx.author)} chciał usunąć nieistniejące zadanie o ID {repr(id_zadania)}')
         await ctx.respond("Nie znaleziono zadania o podanym ID!")
         return
 
     znaleziono.task.cancel()
     bot.stan.lista_zadan.remove(znaleziono)
+    logger.info(f'Użytkownik {repr(ctx.author)} usunął zadanie: {repr(znaleziono)}')
     await ctx.respond("Usunięto zadanie!")
 
 
@@ -399,6 +447,7 @@ async def spis(
                           ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"))
     else:
         await ctx.respond(ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"), **wynik)
+    logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił spis{f' ({dodatkowe_opcje})' if dodatkowe_opcje else ''}")
 
 
 @bot.slash_command(guild_ids=[DEV[1]], default_permission=False)
@@ -425,10 +474,11 @@ def main():
     """Startuje bota zajmującego się spisem zadań domowych, wczytując token z os.environ"""
     token = getenv("Spis_Token")
     if not token:
-        print('Nie udało się odnaleźć tokena!\nUpewnij się, że podano go w zmiennej środowiskowej "Spis_Token".')
+        logger.critical('Nie udało się odnaleźć tokena! Podaj go w zmiennej środowiskowej "Spis_Token"')
         return
 
     bot.autosave = getenv("Spis_Autosave", "t").lower() in ("true", "t", "yes", "y", "1", "on", "prawda", "p", "tak")
+    logger.debug(f"Autosave: {bot.autosave}")
     bot.run(token)
 
 
