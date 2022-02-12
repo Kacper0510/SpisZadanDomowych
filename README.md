@@ -19,6 +19,7 @@ Spis_Token = string z Discordowym tokenem
 Spis_Edytor = rola odpowiadająca za edycję spisu (w formacie <id_roli>:<id_serwera>)
 Spis_Dev = rola mająca dostęp do komend developerskich (w formacie <id_roli>:<id_serwera>)
 Spis_Autosave = opcjonalne, prawda|fałsz (domyślnie: prawda)
+Spis_LogLevel = opcjonalne, DEBUG|INFO|WARNING|ERROR|CRITICAL (domyślnie: INFO)
 ```
 
 Wszystko gotowe! Uruchom bota za pomocą:
