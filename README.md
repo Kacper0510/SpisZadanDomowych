@@ -1,7 +1,7 @@
 <h1 align="center">Spis Zadań Domowych</h1>
 
 ## Podstawowe informacje
-Jest to bot służący do zarządzania i wyświetlania spisu zadań domowych na platformie Discord.
+Jest to bot na platformie Discord służący do zarządzania spisem zadań domowych i go wyświetlania.
 
 ## Instalacja
 Spis pisany jest pod **Pythona 3.10**, więc niekoniecznie będzie działał na poprzednich wersjach.

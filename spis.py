@@ -10,6 +10,7 @@ from os import getenv
 from sys import stdout
 from typing import cast, Any, List
 
+import aiohttp  # Pycord i tak to importuje, nie trzeba dodawać do requirements
 import discord
 from dateutil.parser import parserinfo, ParserError, parser
 from dateutil.relativedelta import relativedelta
@@ -51,6 +52,29 @@ def _wczytaj_role_z_env(nazwa: str):
 
 EDYTOR = _wczytaj_role_z_env("Edytor")
 DEV = _wczytaj_role_z_env("Dev")
+
+# Regex do znajdowania wszystkich linków w treści zadania
+LINK_REGEX = re.compile(r"(https?://[a-zA-Z0-9-._~:/?#\[\]@!$&'()*+,;=%]*[a-zA-Z0-9-_~:/?#\[\]@!$&'()*+;=%])")
+# Link do API GitHuba, aby zdobyć informacje o najnowszych zmianach
+LINK_GITHUB_API = "https://api.github.com/repos/Kacper0510/SpisZadanDomowych/commits?per_page=1"
+OSTATNI_COMMIT: dict | None = None
+
+
+async def pobierz_informacje_z_githuba() -> None:
+    """Pobiera informacje o ostatnich zmianach z GitHuba i zapisuje je do zmiennej OSTATNI_COMMIT"""
+    global OSTATNI_COMMIT
+    try:
+        async with aiohttp.ClientSession() as session, session.get(LINK_GITHUB_API) as response:
+            dane = (await response.json())[0]
+        logger.info(f"Wczytano informacje z GitHuba: {dane['sha']}")
+
+        # Ładne sformatowanie wczytanych informacji
+        OSTATNI_COMMIT = \
+            f"<t:{int(datetime.strptime(dane['commit']['author']['date'], '%Y-%m-%dT%H:%M:%S%z').timestamp())}:R> " \
+            f"- `{dane['sha'][:7]}` - [" + dane['commit']['message'].split('\n')[0] + f"]({dane['html_url']})"
+    except aiohttp.ClientError as e:
+        logger.exception(f"Nie udało się wczytać informacji z GitHuba!", exc_info=e)
+
 
 # ------------------------- STRUKTURY DANYCH
 
@@ -169,12 +193,6 @@ class Przedmioty(Enum):
         return {cast(str, p.nazwa): p for p in cls}
 
 
-# Regex do znajdowania wszystkich linków w treści zadania
-LINK_REGEX = re.compile(
-    r"(https?://[a-zA-Z0-9-._~:/?#\[\]@!$&'()*+,;=%]*[a-zA-Z0-9-_~:/?#\[\]@!$&'()*+;=%])"
-)
-
-
 @dataclass(order=True, unsafe_hash=True)
 class ZadanieDomowe:
     """Reprezentuje jedno zadanie domowe"""
@@ -241,6 +259,8 @@ class StanBota:
     """Klasa przechowująca stan bota między uruchomieniami"""
 
     lista_zadan: SortedList[ZadanieDomowe] = field(default_factory=SortedList)
+    ostatni_zapis: datetime = field(default_factory=datetime.now)
+    uzycia_spis: int = 0  # Globalna ilość użyć /spis
 
 
 class SpisBot(discord.Bot):
@@ -259,17 +279,22 @@ class SpisBot(discord.Bot):
         self.backup_kanal: discord.DMChannel | None = None  # Kanał do zapisywania/backupowania/wczytywania stanu spisu
         self.stan: StanBota | None = None
         self.autosave = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
+        self.czas_startu = datetime.now()  # Czas startu bota, do obliczania uptime
+        self.invite_link: str = ""  # Link do zaproszenia bota na serwer
 
     async def zapisz(self) -> None:
         """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
+        ostatni_zapis_old = self.stan.ostatni_zapis  # Do przywrócenia w przypadku niepowodzenia zapisu
+        self.stan.ostatni_zapis = datetime.now()
         try:
             backup = pickle.dumps(self.stan, pickle.HIGHEST_PROTOCOL)
-            plik = discord.File(BytesIO(backup), f"spis_backup_{int(datetime.now().timestamp())}.pickle")
+            plik = discord.File(BytesIO(backup), f"spis_backup_{round(self.stan.ostatni_zapis.timestamp())}.pickle")
             await self.backup_kanal.send("", file=plik)
             logger.info(f"Pomyślnie zapisano plik {plik.filename} na kanale {repr(self.backup_kanal)}")
             logger.debug(f"Zapisane dane: {repr(self.stan)}")
         except pickle.PickleError as e:
             logger.exception("Nie udało się zapisać stanu jako obiekt pickle!", exc_info=e)
+            self.stan.ostatni_zapis = ostatni_zapis_old
 
     async def wczytaj(self) -> None:
         """Wczytuje stan bota z kanału prywatnego twórcy bota"""
@@ -287,13 +312,7 @@ class SpisBot(discord.Bot):
                 if zadanie.termin < datetime.now():
                     self.stan.lista_zadan.remove(zadanie)
 
-            # Wczytanie czasu, skąd pochodzi backup
-            try:
-                czas_backupu = datetime.fromtimestamp(int(ostatnia_wiadomosc.attachments[0].filename[12:-7]))
-            except (OSError, ValueError):  # Błąd parsowania
-                czas_backupu = ostatnia_wiadomosc.created_at
-
-            logger.info(f"Pomyślnie wczytano backup z {czas_backupu.strftime(LOGGER_FORMAT_DATY)} "
+            logger.info(f"Pomyślnie wczytano backup z {self.stan.ostatni_zapis.strftime(LOGGER_FORMAT_DATY)} "
                         f"z kanału {repr(self.backup_kanal)}")
             logger.debug(f"Zapisane dane: {repr(self.stan)}")
         except (pickle.PickleError, IndexError) as e:
@@ -311,6 +330,15 @@ class SpisBot(discord.Bot):
             await self.wczytaj()  # Próba wczytania
         else:
             self.stan = StanBota()
+
+        self.invite_link = f"https://discord.com/api/oauth2/authorize?client_id={self.application_id}" \
+                           f"&permissions=277025672192&scope=bot%20applications.commands"
+        await pobierz_informacje_z_githuba()
+
+    # noinspection PyMethodMayBeStatic
+    async def on_guild_join(self, guild):
+        """Wywoływane, gdy bota dodano do serwera"""
+        logger.info(f"Bot został dodany do serwera {repr(guild)}")
 
     async def close(self):
         """Zamyka bota zapisując jego stan"""
@@ -447,7 +475,53 @@ async def spis(
                           ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"))
     else:
         await ctx.respond(ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"), **wynik)
+    bot.stan.uzycia_spis += 1
     logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił spis{f' ({dodatkowe_opcje})' if dodatkowe_opcje else ''}")
+
+
+@bot.slash_command()
+async def info(ctx: commands.ApplicationContext):
+    """Wyświetla statystyki i informacje o bocie"""
+    # Kolor przewodni wywołującego komendę
+    kolor_uzytkownika = (await bot.fetch_user(ctx.author.id)).accent_color or discord.embeds.EmptyEmbed
+    embed = discord.Embed(color=kolor_uzytkownika,
+                          title="Informacje o bocie",
+                          url="https://www.youtube.com/watch?v=dQw4w9WgXcQ")  # Rickroll, bo czemu nie XD
+    embed.set_thumbnail(url=bot.user.avatar.url)  # Miniatura - profilowe bota
+
+    # Pola embeda
+    embed.add_field(name="Twórca bota", value=str(bot.backup_kanal.recipient), inline=False)
+
+    embed.add_field(name="Ping", value=f"{round(bot.latency * 1000)} ms")
+    uptime = str(datetime.now() - bot.czas_startu)
+    if kropka := uptime.find("."):  # Pozbywamy się mikrosekund
+        uptime = uptime[:kropka]
+    embed.add_field(name="Czas pracy", value=uptime)
+    embed.add_field(name="Serwery", value=len(bot.guilds))
+
+    embed.add_field(name="Ostatni backup", value=f"<t:{round(bot.stan.ostatni_zapis.timestamp())}:R>")
+    embed.add_field(name="Globalna ilość użyć `/spis`", value=bot.stan.uzycia_spis)
+
+    if OSTATNI_COMMIT:
+        embed.add_field(name="Ostatnia aktualizacja", value=OSTATNI_COMMIT, inline=False)
+
+    # Przyciski pod wiadomością
+    przyciski = discord.ui.View(
+        discord.ui.Button(
+            label="Dodaj na serwer",
+            url=bot.invite_link,
+            emoji="📲"
+        ),
+        discord.ui.Button(
+            label="Kod źródłowy i informacje",
+            url="https://github.com/Kacper0510/SpisZadanDomowych",
+            emoji="⌨"
+        ),
+        timeout=None
+    )
+
+    await ctx.respond(embed=embed, ephemeral=True, view=przyciski)
+    logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił informacje o bocie")
 
 
 @bot.slash_command(guild_ids=[DEV[1]], default_permission=False)
