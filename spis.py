@@ -261,7 +261,7 @@ class SpisBot(discord.Bot):
         self.stan: StanBota | None = None
         self.autosave = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
 
-    async def zapisz(self) -> None:
+    async def zapisz(self) -> bool:
         """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
         try:
             backup = pickle.dumps(self.stan, pickle.HIGHEST_PROTOCOL)
@@ -269,17 +269,19 @@ class SpisBot(discord.Bot):
             await self.backup_kanal.send("", file=plik)
             logger.info(f"Pomyślnie zapisano plik {plik.filename} na kanale {repr(self.backup_kanal)}")
             logger.debug(f"Zapisane dane: {repr(self.stan)}")
+            return True
         except pickle.PickleError as e:
             logger.exception("Nie udało się zapisać stanu jako obiekt pickle!", exc_info=e)
+            return False
 
-    async def wczytaj(self) -> None:
+    async def wczytaj(self) -> bool:
         """Wczytuje stan bota z kanału prywatnego twórcy bota"""
         try:
             ostatnia_wiadomosc = (await self.backup_kanal.history(limit=1).flatten())[0]
             if len(ostatnia_wiadomosc.attachments) != 1:
                 logger.warning(f"Ostatnia wiadomość na kanale {repr(self.backup_kanal)} miała złą ilość załączników, "
                                f"porzucono wczytywanie stanu!")
-                return
+                return False
             dane = await ostatnia_wiadomosc.attachments[0].read()
             self.stan = pickle.loads(dane, fix_imports=False)
 
@@ -297,9 +299,11 @@ class SpisBot(discord.Bot):
             logger.info(f"Pomyślnie wczytano backup z {czas_backupu.strftime(LOGGER_FORMAT_DATY)} "
                         f"z kanału {repr(self.backup_kanal)}")
             logger.debug(f"Zapisane dane: {repr(self.stan)}")
+            return True
         except (pickle.PickleError, IndexError) as e:
             logger.exception("Nie udało się wczytać pliku pickle!", exc_info=e)
             self.stan = StanBota()
+            return False
 
     async def on_ready(self):
         """Wykonywane przy starcie bota"""
@@ -323,7 +327,10 @@ class SpisBot(discord.Bot):
 
 
 PDP = PolskiDateParser()  # Globalna instancja klasy PolskiDateParser
-bot = SpisBot()
+bot = SpisBot(
+    intents=discord.Intents(guilds=True, dm_messages=True),
+    activity=discord.Activity(type=discord.ActivityType.watching, name="/spis")
+)
 
 # ------------------------- STYLE
 
