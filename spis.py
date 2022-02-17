@@ -193,16 +193,16 @@ class Przedmioty(Enum):
         return {cast(str, p.nazwa): p for p in cls}
 
 
-@dataclass(order=True, unsafe_hash=True)
-class ZadanieDomowe:
-    """Reprezentuje jedno zadanie domowe"""
+@total_ordering
+@dataclass(eq=False, unsafe_hash=True)
+class Ogloszenie:
+    """Reprezentuje ogłoszenie wyświetlające się pod spisem"""
 
     termin: datetime
-    przedmiot: Przedmioty
     tresc: str
     utworzono: tuple[int, datetime]  # Zawiera ID autora i datę utworzenia
-    id: str = field(hash=False)
-    task: tasks.Loop = field(hash=False, compare=False, repr=False)
+    id: str = field(init=False, hash=False)
+    task: tasks.Loop = field(init=False, hash=False, repr=False)
 
     @staticmethod
     def popraw_linki(tekst: str) -> str:
@@ -231,26 +231,50 @@ class ZadanieDomowe:
         usun_zadanie_po_terminie.start()  # Wystartuj task
         return usun_zadanie_po_terminie
 
-    def __init__(self, termin, przedmiot, tresc, autor: discord.User):
-        """Inicjalizuje zadanie domowe i tworzy task do jego usunięcia"""
-        self.tresc = self.popraw_linki(tresc)
-        self.termin = termin
-        self.przedmiot = przedmiot
-        self.utworzono = autor.id, datetime.now()
+    def _wartosci_z_dicta_bez_taska(self) -> tuple:
+        """Zwraca tuple wszystkich pól obiektu z wyłączeniem taska.
+        Używane w pickle oraz w porównywaniu obiektów"""
+        return tuple(v for k, v in self.__dict__.items() if k != "task")
+
+    def __post_init__(self):
+        """Inicjalizuje ID i tworzy task do usunięcia ogłoszenia"""
+        self.tresc = self.popraw_linki(self.tresc)
         self.id = hex(abs(hash(self)))[2:]
         self.task = self.stworz_task()
+
+    def __eq__(self, other) -> bool:
+        """Porównuje to ogłoszenie z innym obiektem"""
+        return type(self) == type(other) and self._wartosci_z_dicta_bez_taska() == other._wartosci_z_dicta_bez_taska()
+
+    def __lt__(self, other) -> bool:
+        """Służy głównie do sortowania ogłoszeń lub zadań domowych"""
+        if type(self) != type(other):
+            return type(self).__name__ > type(other).__name__  # Chcę, aby ogłoszenia znajdowały się na końcu spisu
+        return self._wartosci_z_dicta_bez_taska() < other._wartosci_z_dicta_bez_taska()
 
     def __del__(self):
         """Przy destrukcji obiektu anuluje jego task"""
         self.task.cancel()
 
     def __getstate__(self) -> tuple:
-        """Zapisuje w pickle wszystkie dane zadania domowego oprócz taska"""
-        return self.termin, self.przedmiot, self.tresc, self.utworzono, self.id
+        """Zapisuje w pickle wszystkie dane ogłoszenia oprócz taska"""
+        return self._wartosci_z_dicta_bez_taska()
 
     def __setstate__(self, state: tuple):
         """Wczytuje stan obiektu z pickle"""
-        self.termin, self.przedmiot, self.tresc, self.utworzono, self.id = state
+        self.termin, self.tresc, self.utworzono, self.id = state
+        self.task = self.stworz_task()
+
+
+@dataclass(eq=False, unsafe_hash=True)
+class ZadanieDomowe(Ogloszenie):
+    """Reprezentuje zadanie domowe posiadające dodatkowo przedmiot oprócz innych atrybutów ogłoszenia"""
+
+    przedmiot: Przedmioty
+
+    def __setstate__(self, state: tuple):
+        """Wczytuje stan obiektu z pickle"""
+        self.termin, self.tresc, self.utworzono, self.przedmiot, self.id = state
         self.task = self.stworz_task()
 
 
@@ -258,7 +282,7 @@ class ZadanieDomowe:
 class StanBota:
     """Klasa przechowująca stan bota między uruchomieniami"""
 
-    lista_zadan: SortedList[ZadanieDomowe] = field(default_factory=SortedList)
+    lista_zadan: SortedList[Ogloszenie] = field(default_factory=SortedList)
     ostatni_zapis: datetime = field(default_factory=datetime.now)
     uzycia_spis: int = 0  # Globalna ilość użyć /spis
 
@@ -424,7 +448,7 @@ async def dodaj_zadanie(
         return
 
     # Tworzy obiekt zadania i dodaje do spisu
-    nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis, ctx.author)
+    nowe_zadanie = ZadanieDomowe(data, opis, (ctx.author.id, datetime.now()), Przedmioty.lista()[przedmiot])
     bot.stan.lista_zadan.add(nowe_zadanie)
     logger.info(f"Dodano nowe zadanie: {repr(nowe_zadanie)}")
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
