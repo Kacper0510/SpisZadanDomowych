@@ -243,6 +243,10 @@ class StanBota:
 
     lista_zadan: list[ZadanieDomowe] = field(default_factory=list)
 
+    def __hash__(self):
+        """Zwraca hash stanu"""
+        return hash(tuple(self.lista_zadan))
+
 
 class SpisBot(discord.Bot):
     """Rozszerzenie podstawowego bota o potrzebne metody"""
@@ -259,10 +263,16 @@ class SpisBot(discord.Bot):
 
         self.backup_kanal: discord.DMChannel | None = None  # Kanał do zapisywania/backupowania/wczytywania stanu spisu
         self.stan: StanBota | None = None
-        self.autosave = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
+        self.hash_stanu: int = 0  # Hash stanu bota przy ostatnim zapisie/wczytaniu
+        self.autosave: bool = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
 
     async def zapisz(self) -> bool:
-        """Zapisuje stan bota do pliku i wysyła go do twórcy bota"""
+        """Zapisuje stan bota do pliku i wysyła go do twórcy bota.
+        Uwaga: zapis nie odbędzie się w przypadku wykrycia identycznego hasha stanu."""
+        if hash(self.stan) == self.hash_stanu:  # Nic się nie zmieniło od ostatniego zapisu
+            logger.info("Zapis stanu nie był konieczny - identyczny hash")
+            return False
+
         try:
             backup = pickle.dumps(self.stan, pickle.HIGHEST_PROTOCOL)
             plik = discord.File(BytesIO(backup), f"spis_backup_{int(datetime.now().timestamp())}.pickle")
@@ -273,6 +283,8 @@ class SpisBot(discord.Bot):
         except pickle.PickleError as e:
             logger.exception("Nie udało się zapisać stanu jako obiekt pickle!", exc_info=e)
             return False
+        finally:  # Zawsze przekalkuluj hash stanu
+            self.hash_stanu = hash(self.stan)
 
     async def wczytaj(self) -> bool:
         """Wczytuje stan bota z kanału prywatnego twórcy bota"""
@@ -304,6 +316,8 @@ class SpisBot(discord.Bot):
             logger.exception("Nie udało się wczytać pliku pickle!", exc_info=e)
             self.stan = StanBota()
             return False
+        finally:  # Zawsze przekalkuluj hash stanu
+            self.hash_stanu = hash(self.stan)
 
     async def on_ready(self):
         """Wykonywane przy starcie bota"""
