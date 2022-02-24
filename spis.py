@@ -1,5 +1,6 @@
 import logging
 import pickle
+import random
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
@@ -8,7 +9,7 @@ from functools import cache, total_ordering
 from io import BytesIO
 from os import getenv
 from sys import stdout
-from typing import cast, Any, List
+from typing import cast, Any, List, Callable
 
 import aiohttp  # Pycord i tak to importuje, nie trzeba dodawać do requirements
 import discord
@@ -278,6 +279,50 @@ class ZadanieDomowe(Ogloszenie):
         self.task = self.stworz_task()
 
 
+STYLE_DATY: dict[str, Callable[[datetime], str]] = {
+    "Zwykły tekst (domyślny)": lambda d: f"\n{PDP.WEEKDAYS[d.weekday()][1].capitalize()}, "
+                                         f"{d.day} {PDP.MONTHS[d.month - 1][1]}"
+                                         f"{f' {rok}' if (rok := d.year) != date.today().year else ''}:\n",
+    "Formatowanie Discorda": lambda d: f"\n<t:{d.timestamp()}:D>\n",
+    "Data i dzień tygodnia": lambda d: f"\n<t:{d.timestamp()}:F>\n",
+    "Krótka data": lambda d: f"\n<t:{d.timestamp()}:d>\n",
+    "Relatywnie": lambda d: f"\n<t:{d.timestamp()}:R>\n",
+    "Nie wyświetlaj daty": lambda d: ""
+}
+
+STYLE_CZASU: dict[str, Callable[[datetime], str]] = {
+    "Zwykły tekst (domyślny)": lambda d: f' *({d.hour}:{d.minute:02})* ',
+    "Formatowanie Discorda": lambda d: f' (<t:{d.timestamp()}:t>)',
+    "Nie wyświetlaj czasu": lambda d: ""
+}
+
+STYLE_EMOJI: dict[str, Callable[[Przedmioty], str]] = {
+    "Zwykłe (domyślne)": lambda p: p.emoji[0],
+    "Losowe": lambda p: random.choice(p.emoji),
+    "Nie wyświetlaj": lambda p: ""
+}
+
+STYLE_OPRACOWANIA: list[str] = [
+    "Pod spisem (domyślnie)",
+    "Przy każdym zadaniu",
+    "Przy każdym zadaniu (z datą utworzenia)",
+    "Nie wyświetlaj opracowania"
+]
+
+
+@dataclass
+class Styl:
+    """Przechowuje ustawienia stylu wyświetlania spisu dla danego użytkownika"""
+
+    embed: bool = False  # Wyświetlanie w embedzie zamiast w zwykłym tekście
+    data: str = next(iter(STYLE_DATY))  # Sposób wyświetlania dat
+    czas: str = next(iter(STYLE_CZASU))  # Sposób wyświetlania godziny zadania
+    id: bool = False  # Wyświetlanie ID
+    nazwa_przedmiotu: bool = True  # Wyświetlanie nazwy przedmiotu
+    emoji: str = next(iter(STYLE_EMOJI))  # Sposób wyświetlania emoji przy przedmiocie
+    opracowanie: str = STYLE_OPRACOWANIA[0]  # Sposób wyświetlania opracowania
+
+
 @dataclass
 class StanBota:
     """Klasa przechowująca stan bota między uruchomieniami"""
@@ -285,6 +330,7 @@ class StanBota:
     lista_zadan: SortedList[Ogloszenie] = field(default_factory=SortedList)
     ostatni_zapis: datetime = field(default_factory=datetime.now)
     uzycia_spis: int = 0  # Globalna ilość użyć /spis
+    style: dict[int, Styl] = field(default_factory=dict)  # Styl każdego użytkownika
 
 
 class SpisBot(discord.Bot):
@@ -492,7 +538,7 @@ async def spis(
 ):
     """Wyświetla aktualny stan spisu"""
 
-    styl = pythonowe_repr
+    styl = oryginalny
     wynik = styl(dodatkowe_opcje == "Statystyki dla nerdów")
     if len(wynik) == 1 and "content" in wynik and not wynik["content"]:
         await ctx.respond("Spis jest aktualnie pusty!",
