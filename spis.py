@@ -1,5 +1,6 @@
 import logging
 import pickle
+import random
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, date, timedelta
@@ -8,13 +9,15 @@ from functools import cache, total_ordering
 from io import BytesIO
 from os import getenv
 from sys import stdout
-from typing import cast, Iterable, Any, List
+from typing import cast, Any, List, Callable
 
+import aiohttp  # Pycord i tak to importuje, nie trzeba dodawać do requirements
 import discord
 from dateutil.parser import parserinfo, ParserError, parser
 from dateutil.relativedelta import relativedelta
 from discord import commands  # Uwaga, zwykłe commands, nie discord.ext.commands
 from discord.ext import tasks
+from sortedcontainers import SortedList
 
 # ------------------------- LOGGING
 
@@ -50,6 +53,29 @@ def _wczytaj_role_z_env(nazwa: str):
 
 EDYTOR = _wczytaj_role_z_env("Edytor")
 DEV = _wczytaj_role_z_env("Dev")
+
+# Regex do znajdowania wszystkich linków w treści zadania
+LINK_REGEX = re.compile(r"(https?://[a-zA-Z0-9-._~:/?#\[\]@!$&'()*+,;=%]*[a-zA-Z0-9-_~:/?#\[\]@!$&'()*+;=%])")
+# Link do API GitHuba, aby zdobyć informacje o najnowszych zmianach
+LINK_GITHUB_API = "https://api.github.com/repos/Kacper0510/SpisZadanDomowych/commits?per_page=1"
+OSTATNI_COMMIT: dict | None = None
+
+
+async def pobierz_informacje_z_githuba() -> None:
+    """Pobiera informacje o ostatnich zmianach z GitHuba i zapisuje je do zmiennej OSTATNI_COMMIT"""
+    global OSTATNI_COMMIT
+    try:
+        async with aiohttp.ClientSession() as session, session.get(LINK_GITHUB_API) as response:
+            dane = (await response.json())[0]
+        logger.info(f"Wczytano informacje z GitHuba: {dane['sha']}")
+
+        # Ładne sformatowanie wczytanych informacji
+        OSTATNI_COMMIT = \
+            f"<t:{int(datetime.strptime(dane['commit']['author']['date'], '%Y-%m-%dT%H:%M:%S%z').timestamp())}:R> " \
+            f"- `{dane['sha'][:7]}` - [" + dane['commit']['message'].split('\n')[0] + f"]({dane['html_url']})"
+    except aiohttp.ClientError as e:
+        logger.exception(f"Nie udało się wczytać informacji z GitHuba!", exc_info=e)
+
 
 # ------------------------- STRUKTURY DANYCH
 
@@ -168,20 +194,16 @@ class Przedmioty(Enum):
         return {cast(str, p.nazwa): p for p in cls}
 
 
-# Regex do znajdowania wszystkich linków w treści zadania
-LINK_REGEX = re.compile(
-    r"(https?://[a-zA-Z0-9-._~:/?#\[\]@!$&'()*+,;=%]*[a-zA-Z0-9-_~:/?#\[\]@!$&'()*+;=%])"
-)
-
-
-@dataclass(order=True, unsafe_hash=True)
-class ZadanieDomowe:
-    """Reprezentuje jedno zadanie domowe"""
+@total_ordering
+@dataclass(eq=False, unsafe_hash=True)
+class Ogloszenie:
+    """Reprezentuje ogłoszenie wyświetlające się pod spisem"""
 
     termin: datetime
-    przedmiot: Przedmioty
     tresc: str
-    task: tasks.Loop = field(hash=False, compare=False, repr=False)
+    utworzono: tuple[int, datetime]  # Zawiera ID autora i datę utworzenia
+    id: str = field(init=False, hash=False)
+    task: tasks.Loop = field(init=False, hash=False, repr=False)
 
     @staticmethod
     def popraw_linki(tekst: str) -> str:
@@ -210,42 +232,115 @@ class ZadanieDomowe:
         usun_zadanie_po_terminie.start()  # Wystartuj task
         return usun_zadanie_po_terminie
 
-    def __init__(self, termin, przedmiot, tresc):
-        """Inicjalizuje zadanie domowe i tworzy task do jego usunięcia"""
-        self.tresc = self.popraw_linki(tresc)
-        self.termin = termin
-        self.przedmiot = przedmiot
+    def _wartosci_z_dicta_bez_taska(self) -> tuple:
+        """Zwraca tuple wszystkich pól obiektu z wyłączeniem taska.
+        Używane w pickle oraz w porównywaniu obiektów"""
+        return tuple(v for k, v in self.__dict__.items() if k != "task")
+
+    def __post_init__(self):
+        """Inicjalizuje ID i tworzy task do usunięcia ogłoszenia"""
+        self.tresc = self.popraw_linki(self.tresc)
+        self.id = hex(abs(hash(self)))[2:]
         self.task = self.stworz_task()
 
+    def __eq__(self, other) -> bool:
+        """Porównuje to ogłoszenie z innym obiektem"""
+        return type(self) == type(other) and self._wartosci_z_dicta_bez_taska() == other._wartosci_z_dicta_bez_taska()
+
+    def __lt__(self, other) -> bool:
+        """Służy głównie do sortowania ogłoszeń lub zadań domowych"""
+        if type(self) != type(other):
+            return type(self).__name__ > type(other).__name__  # Chcę, aby ogłoszenia znajdowały się na końcu spisu
+        return self._wartosci_z_dicta_bez_taska() < other._wartosci_z_dicta_bez_taska()
+
     def __del__(self):
-        """Przy destrukcji obiektu kończy też task"""
+        """Przy destrukcji obiektu anuluje jego task"""
         self.task.cancel()
 
     def __getstate__(self) -> tuple:
-        """Zapisuje w pickle wszystkie dane zadania domowego oprócz taska"""
-        return self.termin, self.przedmiot, self.tresc
+        """Zapisuje w pickle wszystkie dane ogłoszenia oprócz taska"""
+        return self._wartosci_z_dicta_bez_taska()
 
     def __setstate__(self, state: tuple):
         """Wczytuje stan obiektu z pickle"""
-        self.termin, self.przedmiot, self.tresc = state
+        self.termin, self.tresc, self.utworzono, self.id = state
         self.task = self.stworz_task()
 
-    @property
-    @cache
-    def id(self):
-        """Zwraca ID zadania, generowane na podstawie hasha zamienionego na system szesnastkowy"""
-        return hex(abs(hash(self)))[2:]
+
+@dataclass(eq=False, unsafe_hash=True)
+class ZadanieDomowe(Ogloszenie):
+    """Reprezentuje zadanie domowe posiadające dodatkowo przedmiot oprócz innych atrybutów ogłoszenia"""
+
+    przedmiot: Przedmioty
+
+    def __setstate__(self, state: tuple):
+        """Wczytuje stan obiektu z pickle"""
+        self.termin, self.tresc, self.utworzono, self.przedmiot, self.id = state
+        self.task = self.stworz_task()
+
+
+STYLE_DATY: dict[str, Callable[[datetime], str]] = {
+    "Zwykły tekst (domyślny)": lambda d: f"\n{PDP.WEEKDAYS[d.weekday()][1].capitalize()}, "
+                                         f"{d.day} {PDP.MONTHS[d.month - 1][1]}"
+                                         f"{f' {rok}' if (rok := d.year) != date.today().year else ''}:\n",
+    "Formatowanie Discorda": lambda d: f"\n<t:{d.timestamp()}:D>\n",
+    "Data i dzień tygodnia": lambda d: f"\n<t:{d.timestamp()}:F>\n",
+    "Krótka data": lambda d: f"\n<t:{d.timestamp()}:d>\n",
+    "Relatywnie": lambda d: f"\n<t:{d.timestamp()}:R>\n",
+    "Nie wyświetlaj daty": lambda d: ""
+}
+
+STYLE_CZASU: dict[str, Callable[[datetime], str]] = {
+    "Zwykły tekst (domyślny)": lambda d: f' *({d.hour}:{d.minute:02})* ',
+    "Formatowanie Discorda": lambda d: f' (<t:{d.timestamp()}:t>)',
+    "Nie wyświetlaj czasu": lambda d: ""
+}
+
+STYLE_EMOJI: dict[str, Callable[[Przedmioty], str]] = {
+    "Zwykłe (domyślne)": lambda p: p.emoji[0],
+    "Losowe": lambda p: random.choice(p.emoji),
+    "Nie wyświetlaj": lambda p: ""
+}
+
+STYLE_OPRACOWANIA: list[str] = [
+    "Pod spisem (domyślnie)",
+    "Przy każdym zadaniu",
+    "Przy każdym zadaniu (z datą utworzenia)",
+    "Nie wyświetlaj opracowania"
+]
+
+
+@dataclass
+class Styl:
+    """Przechowuje ustawienia stylu wyświetlania spisu dla danego użytkownika"""
+
+    embed: bool = False  # Wyświetlanie w embedzie zamiast w zwykłym tekście
+    data: str = next(iter(STYLE_DATY))  # Sposób wyświetlania dat
+    czas: str = next(iter(STYLE_CZASU))  # Sposób wyświetlania godziny zadania
+    id: bool = False  # Wyświetlanie ID
+    nazwa_przedmiotu: bool = True  # Wyświetlanie nazwy przedmiotu
+    emoji: str = next(iter(STYLE_EMOJI))  # Sposób wyświetlania emoji przy przedmiocie
+    opracowanie: str = STYLE_OPRACOWANIA[0]  # Sposób wyświetlania opracowania
 
 
 @dataclass
 class StanBota:
     """Klasa przechowująca stan bota między uruchomieniami"""
 
-    lista_zadan: list[ZadanieDomowe] = field(default_factory=list)
+    lista_zadan: SortedList[Ogloszenie] = field(default_factory=SortedList)
+    ostatni_zapis: datetime = field(default_factory=datetime.now)
+    uzycia_spis: int = 0  # Globalna ilość użyć /spis
+    style: dict[int, Styl] = field(default_factory=dict)  # Styl każdego użytkownika
 
     def __hash__(self):
         """Zwraca hash stanu"""
-        return hash(tuple(self.lista_zadan))
+        dane_do_hashowania: tuple = (
+            tuple(self.lista_zadan),
+            self.ostatni_zapis,
+            self.uzycia_spis,
+            frozenset(self.style.items())
+        )
+        return hash(dane_do_hashowania)
 
 
 class SpisBot(discord.Bot):
@@ -265,6 +360,8 @@ class SpisBot(discord.Bot):
         self.stan: StanBota | None = None
         self.hash_stanu: int = 0  # Hash stanu bota przy ostatnim zapisie/wczytaniu
         self.autosave: bool = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
+        self.czas_startu = datetime.now()  # Czas startu bota, do obliczania uptime
+        self.invite_link: str = ""  # Link do zaproszenia bota na serwer
 
     async def zapisz(self) -> bool:
         """Zapisuje stan bota do pliku i wysyła go do twórcy bota.
@@ -273,15 +370,18 @@ class SpisBot(discord.Bot):
             logger.info("Zapis stanu nie był konieczny - identyczny hash")
             return False
 
+        ostatni_zapis_old = self.stan.ostatni_zapis  # Do przywrócenia w przypadku niepowodzenia zapisu
+        self.stan.ostatni_zapis = datetime.now()
         try:
             backup = pickle.dumps(self.stan, pickle.HIGHEST_PROTOCOL)
-            plik = discord.File(BytesIO(backup), f"spis_backup_{int(datetime.now().timestamp())}.pickle")
+            plik = discord.File(BytesIO(backup), f"spis_backup_{round(self.stan.ostatni_zapis.timestamp())}.pickle")
             await self.backup_kanal.send("", file=plik)
             logger.info(f"Pomyślnie zapisano plik {plik.filename} na kanale {repr(self.backup_kanal)}")
             logger.debug(f"Zapisane dane: {repr(self.stan)}")
             return True
         except pickle.PickleError as e:
             logger.exception("Nie udało się zapisać stanu jako obiekt pickle!", exc_info=e)
+            self.stan.ostatni_zapis = ostatni_zapis_old
             return False
         finally:  # Zawsze przekalkuluj hash stanu
             self.hash_stanu = hash(self.stan)
@@ -302,13 +402,7 @@ class SpisBot(discord.Bot):
                 if zadanie.termin < datetime.now():
                     self.stan.lista_zadan.remove(zadanie)
 
-            # Wczytanie czasu, skąd pochodzi backup
-            try:
-                czas_backupu = datetime.fromtimestamp(int(ostatnia_wiadomosc.attachments[0].filename[12:-7]))
-            except (OSError, ValueError):  # Błąd parsowania
-                czas_backupu = ostatnia_wiadomosc.created_at
-
-            logger.info(f"Pomyślnie wczytano backup z {czas_backupu.strftime(LOGGER_FORMAT_DATY)} "
+            logger.info(f"Pomyślnie wczytano backup z {self.stan.ostatni_zapis.strftime(LOGGER_FORMAT_DATY)} "
                         f"z kanału {repr(self.backup_kanal)}")
             logger.debug(f"Zapisane dane: {repr(self.stan)}")
             return True
@@ -331,6 +425,15 @@ class SpisBot(discord.Bot):
         else:
             self.stan = StanBota()
 
+        self.invite_link = f"https://discord.com/api/oauth2/authorize?client_id={self.application_id}" \
+                           f"&permissions=277025672192&scope=bot%20applications.commands"
+        await pobierz_informacje_z_githuba()
+
+    # noinspection PyMethodMayBeStatic
+    async def on_guild_join(self, guild):
+        """Wywoływane, gdy bota dodano do serwera"""
+        logger.info(f"Bot został dodany do serwera {repr(guild)}")
+
     async def close(self):
         """Zamyka bota zapisując jego stan"""
         if self.autosave:
@@ -349,17 +452,13 @@ bot = SpisBot(
 # ------------------------- STYLE
 
 
-def _sorted_spis() -> list[ZadanieDomowe]:
-    """Skrót do sorted(lista_zadan), bo PyCharm twierdzi, że przekazuję zły typ danych..."""
-    return sorted(cast(Iterable, bot.stan.lista_zadan))
-
-
+# Style i tak będą przepisane
 def oryginalny(dev: bool) -> dict[str, Any]:
     """Oryginalny styl spisu jeszcze sprzed istnienia tego bota (domyślne)"""
 
     wiadomosc = ""
     dzien = date.today() - timedelta(days=1)  # Wczoraj
-    for zadanie in _sorted_spis():
+    for zadanie in bot.stan.lista_zadan:
         # Wyświetlanie dni
         if (data_zadania := zadanie.termin.date()) > dzien:
             wiadomosc += f"\n{PDP.WEEKDAYS[data_zadania.weekday()][1].capitalize()}, " \
@@ -379,9 +478,11 @@ def oryginalny(dev: bool) -> dict[str, Any]:
     return {"content": wiadomosc.strip()}
 
 
-def pythonowe_repr(dev: bool) -> dict[str, Any]:
+def pythonowe_repr(_dev: bool) -> dict[str, Any]:
     """Lista wywołań Pythonowego repr() na każdym zadaniu domowym"""
-    return {"content": "\n".join([(f'{zadanie.id}: ' if dev else '') + repr(zadanie) for zadanie in _sorted_spis()])}
+    return {"content": "\n".join(
+        [repr(zadanie) for zadanie in bot.stan.lista_zadan]
+    )}
 
 # ------------------------- KOMENDY
 
@@ -404,6 +505,9 @@ async def dodaj_zadanie(
 ):
     """Dodaje nowe zadanie do spisu"""
 
+    if len(opis) > 400:
+        await ctx.respond("Za długa treść zadania!\nLimit znaków: 400")
+        return
     try:
         data = PDP.parse(termin)  # Konwertuje datę/godzinę podaną przez użytkownika na datetime
         if data < datetime.now():
@@ -417,8 +521,8 @@ async def dodaj_zadanie(
         return
 
     # Tworzy obiekt zadania i dodaje do spisu
-    nowe_zadanie = ZadanieDomowe(data, Przedmioty.lista()[przedmiot], opis)
-    bot.stan.lista_zadan.append(nowe_zadanie)
+    nowe_zadanie = ZadanieDomowe(data, opis, (ctx.author.id, datetime.now()), Przedmioty.lista()[przedmiot])
+    bot.stan.lista_zadan.add(nowe_zadanie)
     logger.info(f"Dodano nowe zadanie: {repr(nowe_zadanie)}")
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
 
@@ -468,7 +572,53 @@ async def spis(
                           ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"))
     else:
         await ctx.respond(ephemeral=(dodatkowe_opcje != "Wyślij wiadomość jako widoczną dla wszystkich"), **wynik)
+    bot.stan.uzycia_spis += 1
     logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił spis{f' ({dodatkowe_opcje})' if dodatkowe_opcje else ''}")
+
+
+@bot.slash_command()
+async def info(ctx: commands.ApplicationContext):
+    """Wyświetla statystyki i informacje o bocie"""
+    # Kolor przewodni wywołującego komendę
+    kolor_uzytkownika = (await bot.fetch_user(ctx.author.id)).accent_color or discord.embeds.EmptyEmbed
+    embed = discord.Embed(color=kolor_uzytkownika,
+                          title="Informacje o bocie",
+                          url="https://www.youtube.com/watch?v=dQw4w9WgXcQ")  # Rickroll, bo czemu nie XD
+    embed.set_thumbnail(url=bot.user.avatar.url)  # Miniatura - profilowe bota
+
+    # Pola embeda
+    embed.add_field(name="Twórca bota", value=str(bot.backup_kanal.recipient), inline=False)
+
+    embed.add_field(name="Ping", value=f"{round(bot.latency * 1000)} ms")
+    uptime = str(datetime.now() - bot.czas_startu)
+    if kropka := uptime.find("."):  # Pozbywamy się mikrosekund
+        uptime = uptime[:kropka]
+    embed.add_field(name="Czas pracy", value=uptime)
+    embed.add_field(name="Serwery", value=len(bot.guilds))
+
+    embed.add_field(name="Ostatni backup", value=f"<t:{round(bot.stan.ostatni_zapis.timestamp())}:R>")
+    embed.add_field(name="Globalna ilość użyć `/spis`", value=bot.stan.uzycia_spis)
+
+    if OSTATNI_COMMIT:
+        embed.add_field(name="Ostatnia aktualizacja", value=OSTATNI_COMMIT, inline=False)
+
+    # Przyciski pod wiadomością
+    przyciski = discord.ui.View(
+        discord.ui.Button(
+            label="Dodaj na serwer",
+            url=bot.invite_link,
+            emoji="📲"
+        ),
+        discord.ui.Button(
+            label="Kod źródłowy i informacje",
+            url="https://github.com/Kacper0510/SpisZadanDomowych",
+            emoji="⌨"
+        ),
+        timeout=None
+    )
+
+    await ctx.respond(embed=embed, ephemeral=True, view=przyciski)
+    logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił informacje o bocie")
 
 
 @bot.slash_command(guild_ids=[DEV[1]], default_permission=False)
