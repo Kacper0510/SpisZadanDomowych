@@ -114,8 +114,9 @@ class PolskiDateParser(parserinfo, parser):
         parser.__init__(self, self)  # Ustawienie parserinfo na self
 
     # noinspection PyMethodMayBeStatic
-    def _build_naive(self, res, default: datetime):
-        """Nadpisane, aby naprawić problem z datami w przeszłości"""
+    def _build_naive(self, res, default: datetime) -> tuple[datetime, datetime]:
+        """Nadpisane, aby naprawić problem z datami w przeszłości.
+        Teraz zwraca tuple dwóch dat, zgodnie z opisem w docstringu parse()."""
         logging.debug(f"Parsowanie daty - surowe dane: {res}")
         replacement = {}
         for attr in ("year", "month", "day", "hour", "minute", "second", "microsecond"):
@@ -139,8 +140,38 @@ class PolskiDateParser(parserinfo, parser):
             elif res.month is not None and res.year is None:
                 default += relativedelta(years=1)
 
-        logging.debug(f"Parsowanie daty - wynik: {default}")
-        return default
+        # Data usunięcia przesunięta odpowiednio do przodu od daty podanej przez użytkownika, zgodnie z sugestiami KK
+        data_usuniecia = default
+        # Przesuń godzinę do przodu o 45 min, chyba że użytkownik naprawdę wie, co robi (podał dużą dokładność)
+        if res.second is None and res.microsecond is None:
+            data_usuniecia += timedelta(minutes=45)
+            # Przesuń godzinę na 16:00, jeśli użytkownik nie podał w ogóle godziny
+            if res.hour is None and res.minute is None:
+                data_usuniecia += timedelta(hours=15, minutes=15)  # 15:15 + 45 min = 16:00
+
+        logging.debug(f"Parsowanie daty - wynik: {default}, {data_usuniecia}")
+        return default, data_usuniecia
+
+    # noinspection PyUnresolvedReferences
+    def parse(self, timestr, default=None, ignoretz=False, tzinfos=None, **kwargs) -> tuple[datetime, datetime]:
+        """Nadpisanie parser.parse - zwraca dwie daty zamiast jednej.
+        Pierwszy datetime to prawdziwa data podana przez użytkownika, a drugi - zmodyfikowana data usunięcia zadania."""
+
+        # Kod skopiowany w większości z oryginalnej implementacji
+        if default is None:
+            default = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        res = self._parse(timestr, **kwargs)[0]  # Ignorujemy resztę zwracanego tuple
+        if res is None:
+            raise ParserError("Unknown string format: %s", timestr)
+        if len(res) == 0:
+            raise ParserError("String does not contain a date: %s", timestr)
+        try:
+            p, m = self._build_naive(res, default)
+        except ValueError as e:
+            raise ParserError(str(e) + ": %s", timestr) from e
+        if not ignoretz:
+            p, m = self._build_tzaware(p, res, tzinfos), self._build_tzaware(m, res, tzinfos)
+        return p, m
 
 
 @total_ordering
@@ -199,7 +230,7 @@ class Przedmioty(Enum):
 class Ogloszenie:
     """Reprezentuje ogłoszenie wyświetlające się pod spisem"""
 
-    termin: datetime
+    termin_usuniecia: datetime
     tresc: str
     utworzono: tuple[int, datetime]  # Zawiera ID autora i datę utworzenia
     id: str = field(init=False, hash=False)
@@ -214,23 +245,19 @@ class Ogloszenie:
         logger.debug(f'Poprawianie linków: {repr(tekst)} na {repr(ret)}')
         return ret
 
-    def stworz_task(self) -> tasks.Loop:
+    def stworz_task(self):
         """Tworzy task, którego celem jest usunięcie danego zadania domowego po upłynięciu jego terminu"""
 
-        termin = (self.termin - datetime.now()).total_seconds() + 5  # 5 sekund później, just to be sure
-
-        # Jeśli nie podano godziny przy tworzeniu zadania, usuń je dopiero o godzinie 23:59:30 danego dnia
-        if self.termin.hour == 0 and self.termin.minute == 0:
-            termin += 86370  # 23*60*60+59*60+30
+        termin = (self.termin_usuniecia - datetime.now()).total_seconds()
 
         # Wykonaj 2 razy, raz po utworzeniu, raz po upłynięciu czasu
         @tasks.loop(seconds=termin, count=2)
         async def usun_zadanie_po_terminie():
-            if self.termin < datetime.now():  # Upewnij się, że to już czas
+            if self.termin_usuniecia < datetime.now():  # Upewnij się, że to już czas
                 bot.stan.lista_zadan.remove(self)
 
         usun_zadanie_po_terminie.start()  # Wystartuj task
-        return usun_zadanie_po_terminie
+        self.task = usun_zadanie_po_terminie
 
     def _wartosci_z_dicta_bez_taska(self) -> tuple:
         """Zwraca tuple wszystkich pól obiektu z wyłączeniem taska.
@@ -241,7 +268,7 @@ class Ogloszenie:
         """Inicjalizuje ID i tworzy task do usunięcia ogłoszenia"""
         self.tresc = self.popraw_linki(self.tresc)
         self.id = hex(abs(hash(self)))[2:]
-        self.task = self.stworz_task()
+        self.stworz_task()
 
     def __eq__(self, other) -> bool:
         """Porównuje to ogłoszenie z innym obiektem"""
@@ -263,8 +290,8 @@ class Ogloszenie:
 
     def __setstate__(self, state: tuple):
         """Wczytuje stan obiektu z pickle"""
-        self.termin, self.tresc, self.utworzono, self.id = state
-        self.task = self.stworz_task()
+        self.termin_usuniecia, self.tresc, self.utworzono, self.id = state
+        self.stworz_task()
 
 
 @dataclass(eq=False, unsafe_hash=True)
@@ -272,11 +299,12 @@ class ZadanieDomowe(Ogloszenie):
     """Reprezentuje zadanie domowe posiadające dodatkowo przedmiot oprócz innych atrybutów ogłoszenia"""
 
     przedmiot: Przedmioty
+    prawdziwy_termin: datetime  # Wyświetlany termin w zadaniu, zazwyczaj różni się od termin_usuniecia
 
     def __setstate__(self, state: tuple):
         """Wczytuje stan obiektu z pickle"""
-        self.termin, self.tresc, self.utworzono, self.przedmiot, self.id = state
-        self.task = self.stworz_task()
+        self.termin_usuniecia, self.tresc, self.utworzono, self.przedmiot, self.prawdziwy_termin, self.id = state
+        self.stworz_task()
 
 
 STYLE_DATY: dict[str, Callable[[datetime], str]] = {
@@ -399,7 +427,7 @@ class SpisBot(discord.Bot):
 
             # Usuń zadania z przeszłości
             for zadanie in list(self.stan.lista_zadan):
-                if zadanie.termin < datetime.now():
+                if zadanie.termin_usuniecia < datetime.now():
                     self.stan.lista_zadan.remove(zadanie)
 
             logger.info(f"Pomyślnie wczytano backup z {self.stan.ostatni_zapis.strftime(LOGGER_FORMAT_DATY)} "
@@ -460,15 +488,15 @@ def oryginalny(dev: bool) -> dict[str, Any]:
     dzien = date.today() - timedelta(days=1)  # Wczoraj
     for zadanie in bot.stan.lista_zadan:
         # Wyświetlanie dni
-        if (data_zadania := zadanie.termin.date()) > dzien:
+        if (data_zadania := zadanie.prawdziwy_termin.date()) > dzien:
             wiadomosc += f"\n{PDP.WEEKDAYS[data_zadania.weekday()][1].capitalize()}, " \
                          f"{data_zadania.day} {PDP.MONTHS[data_zadania.month - 1][1]}" \
                          f"{f' {rok}' if (rok := data_zadania.year) != date.today().year else ''}:\n"
             dzien = data_zadania
 
         # Wypisywane tylko gdy czas był podany przy tworzeniu zadania
-        czas = f' *(do {zadanie.termin.hour}:{zadanie.termin.minute:02})* ' \
-            if not (zadanie.termin.hour == 0 and zadanie.termin.minute == 0) else ""
+        czas = f' *(do {zadanie.prawdziwy_termin.hour}:{zadanie.prawdziwy_termin.minute:02})* ' \
+            if not (zadanie.prawdziwy_termin.hour == 0 and zadanie.prawdziwy_termin.minute == 0) else ""
         # Jeśli zostały włączone "statystyki dla nerdów"
         dodatkowe = f" [ID: {zadanie.id}]" if dev else ""
         emoji = zadanie.przedmiot.emoji[0]
@@ -482,7 +510,7 @@ def pythonowe_repr(_dev: bool) -> dict[str, Any]:
     """Lista wywołań Pythonowego repr() na każdym zadaniu domowym"""
     return {"content": "\n".join(
         [repr(zadanie) for zadanie in bot.stan.lista_zadan]
-    )}
+    )[:1990]}
 
 # ------------------------- KOMENDY
 
@@ -509,10 +537,10 @@ async def dodaj_zadanie(
         await ctx.respond("Za długa treść zadania!\nLimit znaków: 400")
         return
     try:
-        data = PDP.parse(termin)  # Konwertuje datę/godzinę podaną przez użytkownika na datetime
-        if data < datetime.now():
+        data_p, data_u = PDP.parse(termin)  # Konwertuje datę/godzinę podaną przez użytkownika na dwa datetime'y
+        if data_p < datetime.now():
             logger.debug(f'Użytkownik {repr(ctx.author)} podał datę z przeszłości: '
-                         f'{repr(termin)} -> {data.strftime(LOGGER_FORMAT_DATY)}')
+                         f'{repr(termin)} -> {data_p.strftime(LOGGER_FORMAT_DATY)}')
             await ctx.respond("Zadanie nie zostało zarejestrowane, ponieważ podano datę z przeszłości!")
             return
     except (ParserError, ValueError) as e:
@@ -521,7 +549,7 @@ async def dodaj_zadanie(
         return
 
     # Tworzy obiekt zadania i dodaje do spisu
-    nowe_zadanie = ZadanieDomowe(data, opis, (ctx.author.id, datetime.now()), Przedmioty.lista()[przedmiot])
+    nowe_zadanie = ZadanieDomowe(data_u, opis, (ctx.author.id, datetime.now()), Przedmioty.lista()[przedmiot], data_p)
     bot.stan.lista_zadan.add(nowe_zadanie)
     logger.info(f"Dodano nowe zadanie: {repr(nowe_zadanie)}")
     await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
