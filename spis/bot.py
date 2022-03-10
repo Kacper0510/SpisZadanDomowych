@@ -17,7 +17,9 @@ __all__ = "SpisBot",
 logger = getLogger("spis.bot")
 
 # Link do API GitHuba, aby zdobyć informacje o najnowszych zmianach
-LINK_GITHUB_API = "https://api.github.com/repos/Kacper0510/SpisZadanDomowych/commits?per_page=1"
+LINK_GITHUB_API: str = "https://api.github.com/repos/Kacper0510/SpisZadanDomowych/commits?per_page=1"
+
+PAKIET_KOMEND: str = "spis.komendy."  # Pythonowy pakiet zawierający komendy (jako rozszerzenia)
 
 
 @dataclass
@@ -140,6 +142,13 @@ class SpisBot(discord.Bot):
         self.invite_link = f"https://discord.com/api/oauth2/authorize?client_id={self.application_id}" \
                            f"&permissions=277025672192&scope=bot%20applications.commands"
         await self._pobierz_informacje_z_githuba()
+
+        # Ładowanie rozszerzeń zawierających komendy bota
+        for ext in ("global", "dev"):
+            self.load_extension(PAKIET_KOMEND + ext)
+        await self.sync_commands()
+
+        logger.info("Wczytywanie zakończone!")
 
     # noinspection PyMethodMayBeStatic
     async def on_guild_join(self, guild):

@@ -1,1 +1,1 @@
-from styl import *
+from .styl import *

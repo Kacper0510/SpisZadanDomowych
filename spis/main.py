@@ -4,7 +4,7 @@ from sys import stdout
 
 from discord import Intents, Activity, ActivityType
 
-__all__ = "PROSTY_FORMAT_DATY", "EDYTOR_ROLA", "DEV_ROLA", "OSTATNI_COMMIT", "main"
+__all__ = "PROSTY_FORMAT_DATY", "OSTATNI_COMMIT", "main", "bot"
 logger = logging.getLogger("spis.main")
 
 PROSTY_FORMAT_DATY = "%d.%m.%y %H:%M:%S"
@@ -20,26 +20,6 @@ def _konfiguruj_logging():
         stream=stdout  # Miejsce logowania: standardowe wyjście
     )
 
-
-def _wczytaj_role_z_env(nazwa: str):
-    """Wczytuje dane o roli z os.environ.
-    Format: <id_roli>:<id_serwera>"""
-    try:
-        s = getenv(f"Spis_{nazwa}")
-        if not s:
-            logger.warning(f"Nie ustawiono zmiennej środowiskowej Spis_{nazwa}! Takie zachowanie nie było testowane!")
-            return None, None
-        s = s.split(":")
-        ret = tuple(map(int, s))
-        logger.debug(f"Wczytano zmienną środowiskową Spis_{nazwa}: {ret}")
-        return ret
-    except IndexError:
-        logger.warning(f"Zmienną środowiskową Spis_{nazwa} podano w złym formacie!")
-        return None, None
-
-
-EDYTOR_ROLA = _wczytaj_role_z_env("Edytor")
-DEV_ROLA = _wczytaj_role_z_env("Dev")
 
 bot = None
 
