@@ -4,11 +4,10 @@ from sys import stdout
 
 from discord import Intents, Activity, ActivityType
 
-__all__ = "PROSTY_FORMAT_DATY", "OSTATNI_COMMIT", "main", "bot"
-logger = logging.getLogger("spis.main")
+from .bot import SpisBot, PROSTY_FORMAT_DATY
 
-PROSTY_FORMAT_DATY = "%d.%m.%y %H:%M:%S"
-OSTATNI_COMMIT: dict | None = None
+__all__ = "main", "bot"
+logger = logging.getLogger(__name__)
 
 
 def _konfiguruj_logging():
@@ -21,7 +20,7 @@ def _konfiguruj_logging():
     )
 
 
-bot = None
+bot: SpisBot | None = None
 
 
 def main():
@@ -34,7 +33,6 @@ def main():
         return
 
     global bot
-    from .bot import SpisBot
     bot = SpisBot(
         intents=Intents(guilds=True, dm_messages=True),
         activity=Activity(type=ActivityType.watching, name="/spis")
@@ -42,4 +40,9 @@ def main():
 
     bot.autosave = getenv("Spis_Autosave", "t").lower() in ("true", "t", "yes", "y", "1", "on", "prawda", "p", "tak")
     logger.debug(f"Autosave: {bot.autosave}")
+    serwer = getenv("Spis_Dev")
+    if serwer:
+        bot.serwer_dev = int(serwer)
+    logger.debug(f"Serwer developerski: {bot.serwer_dev or '<nie ustawiono>'}")
+
     bot.run(token)

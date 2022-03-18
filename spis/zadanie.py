@@ -6,11 +6,10 @@ from logging import getLogger
 
 from discord.ext import tasks
 
-from .main import bot
 from .przedmiot import Przedmioty
 
 __all__ = "Ogloszenie", "ZadanieDomowe"
-logger = getLogger("spis.zadanie")
+logger = getLogger(__name__)
 
 # Regex do znajdowania wszystkich linków w treści zadania
 LINK_REGEX = re.compile(r"(https?://[a-zA-Z0-9-._~:/?#\[\]@!$&'()*+,;=%]*[a-zA-Z0-9-_~:/?#\[\]@!$&'()*+;=%])")
@@ -45,6 +44,7 @@ class Ogloszenie:
         @tasks.loop(seconds=termin, count=2)
         async def usun_zadanie_po_terminie():
             if self.termin_usuniecia < datetime.now():  # Upewnij się, że to już czas
+                from .main import bot
                 bot.stan.lista_zadan.remove(self)
 
         usun_zadanie_po_terminie.start()  # Wystartuj task

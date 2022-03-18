@@ -9,17 +9,15 @@ import aiohttp
 import discord
 from sortedcontainers import SortedList
 
-from .main import PROSTY_FORMAT_DATY
 from .style import Styl
 from .zadanie import Ogloszenie
 
-__all__ = "SpisBot",
-logger = getLogger("spis.bot")
+__all__ = "SpisBot", "PROSTY_FORMAT_DATY"
+logger = getLogger(__name__)
 
 # Link do API GitHuba, aby zdobyć informacje o najnowszych zmianach
 LINK_GITHUB_API: str = "https://api.github.com/repos/Kacper0510/SpisZadanDomowych/commits?per_page=1"
-
-PAKIET_KOMEND: str = "spis.komendy."  # Pythonowy pakiet zawierający komendy (jako rozszerzenia)
+PROSTY_FORMAT_DATY = "%d.%m.%y %H:%M:%S"
 
 
 @dataclass
@@ -30,6 +28,7 @@ class StanBota:
     ostatni_zapis: datetime = field(default_factory=datetime.now)
     uzycia_spis: int = 0  # Globalna ilość użyć /spis
     style: dict[int, Styl] = field(default_factory=dict)  # Styl każdego użytkownika
+    edytor: tuple[int, int] | None = None  # ID roli edytora i serwera, na którym ta rola istnieje
 
     def __hash__(self):
         """Zwraca hash stanu"""
@@ -37,7 +36,8 @@ class StanBota:
             tuple(self.lista_zadan),
             self.ostatni_zapis,
             self.uzycia_spis,
-            frozenset(self.style.items())
+            frozenset(self.style.items()),
+            self.edytor
         )
         return hash(dane_do_hashowania)
 
@@ -59,6 +59,7 @@ class SpisBot(discord.Bot):
         self.stan: StanBota | None = None
         self.hash_stanu: int = 0  # Hash stanu bota przy ostatnim zapisie/wczytaniu
         self.autosave: bool = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
+        self.serwer_dev: int | None = None  # Serwer do zarejestrowania komend developerskich
         self.czas_startu = datetime.now()  # Czas startu bota, do obliczania uptime
         self.invite_link: str = ""  # Link do zaproszenia bota na serwer
         self.ostatni_commit: str = ""
@@ -127,12 +128,17 @@ class SpisBot(discord.Bot):
         except aiohttp.ClientError as e:
             logger.exception(f"Nie udało się wczytać informacji z GitHuba!", exc_info=e)
 
+    async def on_connect(self):
+        """Nadpisane, aby uniknąć zbędnego wywołania sync_commands()"""
+        pass
+
     async def on_ready(self):
         """Wykonywane przy starcie bota"""
         logger.info(f"Zalogowano jako {self.user}!")
 
         # Inicjalizacja kanału przechowywania backupu
         wlasciciel = (await self.application_info()).owner
+        self.owner_id = wlasciciel.id
         self.backup_kanal = wlasciciel.dm_channel or await wlasciciel.create_dm()
         if self.autosave:
             await self.wczytaj()  # Próba wczytania
@@ -145,7 +151,7 @@ class SpisBot(discord.Bot):
 
         # Ładowanie rozszerzeń zawierających komendy bota
         for ext in ("global", "dev"):
-            self.load_extension(PAKIET_KOMEND + ext)
+            self.load_extension("spis.komendy." + ext)
         await self.sync_commands()
 
         logger.info("Wczytywanie zakończone!")

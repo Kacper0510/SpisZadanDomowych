@@ -5,7 +5,7 @@ from dateutil.parser import parserinfo, ParserError, parser
 from dateutil.relativedelta import relativedelta
 
 __all__ = "PolskiDateParser",
-logger = getLogger("spis.date_parser")
+logger = getLogger(__name__)
 
 
 class _PolskiDateParser(parserinfo, parser):
