@@ -4,6 +4,7 @@ from logging import getLogger
 from discord import commands, embeds, ui, Cog
 
 from ..bot import SpisBot
+from ..style import DOMYSLNY_STYL
 
 logger = getLogger(__name__)
 
@@ -26,7 +27,8 @@ class KomendyGlobalne(Cog):
     ):
         """Wyświetla aktualny stan spisu"""
         wyswietl_wszystkim = wyswietl_wszystkim == "Tak"  # Cast na bool
-        await ctx.respond(repr(self.bot.stan.lista_zadan), ephemeral=not wyswietl_wszystkim)
+        styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
+        await ctx.respond(**styl.formatuj_spis(self.bot.stan.lista_zadan), ephemeral=not wyswietl_wszystkim)
 
         self.bot.stan.uzycia_spis += 1
         logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił spis")

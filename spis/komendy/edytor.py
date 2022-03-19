@@ -1,11 +1,12 @@
 from datetime import datetime
 from logging import getLogger
 
-from discord import commands, Cog
+from discord import commands, Cog, utils
 
 from ..bot import SpisBot, PROSTY_FORMAT_DATY
 from ..date_parser import *
 from ..przedmiot import Przedmioty
+from ..style import DOMYSLNY_STYL
 from ..zadanie import *
 
 logger = getLogger(__name__)
@@ -62,7 +63,9 @@ class KomendyDlaEdytorow(Cog):
                                      Przedmioty.lista()[przedmiot], data_p)
         self.bot.stan.lista_zadan.add(nowe_zadanie)
         logger.info(f"Dodano nowe zadanie: {repr(nowe_zadanie)}")
-        await ctx.respond(f"Dodano nowe zadanie!\nID: {nowe_zadanie.id}")
+
+        styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
+        await ctx.respond(**styl.formatuj_zadanie("Dodano nowe zadanie!", nowe_zadanie))
 
     @dodaj.command()
     async def ogloszenie(
@@ -95,7 +98,9 @@ class KomendyDlaEdytorow(Cog):
         nowe_ogloszenie = Ogloszenie(data_p, opis, (ctx.author.id, datetime.now()))
         self.bot.stan.lista_zadan.add(nowe_ogloszenie)
         logger.info(f"Dodano nowe ogłoszenie: {repr(nowe_ogloszenie)}")
-        await ctx.respond(f"Dodano nowe ogłoszenie!\nID: {nowe_ogloszenie.id}")
+
+        styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
+        await ctx.respond(**styl.formatuj_ogloszenie("Dodano nowe ogłoszenie!", nowe_ogloszenie))
 
     @commands.slash_command()
     async def usun(
@@ -105,11 +110,7 @@ class KomendyDlaEdytorow(Cog):
     ):
         """Usuwa zadanie lub ogłoszenie o podanym ID ze spisu"""
         id_zadania = id_zadania.lower()
-        znaleziono = None
-        for zadanie in self.bot.stan.lista_zadan:
-            if zadanie.id == id_zadania:
-                znaleziono = zadanie
-                break
+        znaleziono = utils.get(self.bot.stan.lista_zadan, id=id_zadania)
 
         if not znaleziono:
             logger.debug(f'Użytkownik {repr(ctx.author)} chciał usunąć nieistniejące ID: {repr(id_zadania)}')
@@ -119,7 +120,12 @@ class KomendyDlaEdytorow(Cog):
         znaleziono.task.cancel()
         self.bot.stan.lista_zadan.remove(znaleziono)
         logger.info(f'Użytkownik {repr(ctx.author)} usunął zadanie/ogłoszenie: {repr(znaleziono)}')
-        await ctx.respond("Usunięto zadanie/ogłoszenie!")
+
+        styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
+        if isinstance(znaleziono, ZadanieDomowe):
+            await ctx.respond(**styl.formatuj_zadanie("Usunięto zadanie!", znaleziono))
+        else:  # Jeśli nie zadanie, to ogłoszenie
+            await ctx.respond(**styl.formatuj_ogloszenie("Usunięto ogłoszenie!", znaleziono))
 
 
 def setup(bot: SpisBot):

@@ -1,10 +1,17 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
+
+from sortedcontainers import SortedList
 
 from .opcje import *
+from ..zadanie import *
+
+__all__ = "Styl",
 
 
 @dataclass
-class Styl:
+class Styl(ABC):
     """Przechowuje ustawienia stylu wyświetlania spisu dla danego użytkownika"""
 
     data: str = next(iter(STYLE_DATY))  # Sposób wyświetlania dat
@@ -13,3 +20,15 @@ class Styl:
     nazwa_przedmiotu: bool = True  # Wyświetlanie nazwy przedmiotu
     emoji: str = next(iter(STYLE_EMOJI))  # Sposób wyświetlania emoji przy przedmiocie
     opracowanie: str = STYLE_OPRACOWANIA[0]  # Sposób wyświetlania opracowania
+
+    @abstractmethod
+    def formatuj_spis(self, spis: SortedList[Ogloszenie]) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def formatuj_zadanie(self, naglowek: str, zadanie: ZadanieDomowe) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def formatuj_ogloszenie(self, naglowek: str, ogloszenie: Ogloszenie) -> dict[str, Any]:
+        pass
