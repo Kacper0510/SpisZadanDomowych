@@ -28,7 +28,8 @@ class StanBota:
     ostatni_zapis: datetime = field(default_factory=datetime.now)
     uzycia_spis: int = 0  # Globalna ilość użyć /spis
     style: dict[int, Styl] = field(default_factory=dict)  # Styl każdego użytkownika
-    edytor: tuple[int, int] | None = None  # ID roli edytora i serwera, na którym ta rola istnieje
+    # edytor: tuple[int, int] | None = None  # ID roli edytora i serwera, na którym ta rola istnieje
+    edytor: tuple[int, int] | None = 931891996577103892, 885830592665628702  # TODO zamienić na powyższe (kiedyś)
 
     def __hash__(self):
         """Zwraca hash stanu"""
@@ -150,7 +151,7 @@ class SpisBot(discord.Bot):
         await self._pobierz_informacje_z_githuba()
 
         # Ładowanie rozszerzeń zawierających komendy bota
-        for ext in ("global", "dev"):
+        for ext in ("global", "dev", "edytor"):
             self.load_extension("spis.komendy." + ext)
         await self.sync_commands()
 

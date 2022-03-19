@@ -3,7 +3,6 @@ from logging import getLogger
 from discord import commands, Cog
 
 from ..bot import SpisBot
-from ..main import bot as main_bot  # Chwilowe rozwiązanie
 
 logger = getLogger(__name__)
 
@@ -12,8 +11,10 @@ class KomendyDeveloperskie(Cog):
 
     def __init__(self, bot: SpisBot):
         self.bot = bot
+        if bot.serwer_dev is not None:
+            self.__cog_commands__[0].guild_ids = [bot.serwer_dev]  # Nadpisanie guild_ids dla dev
 
-    dev = commands.SlashCommandGroup("dev", "Komendy developerskie", guild_ids=[main_bot.serwer_dev],
+    dev = commands.SlashCommandGroup("dev", "Komendy developerskie",
                                      permissions=[commands.CommandPermission("owner", 2, True)])
 
     @dev.command()

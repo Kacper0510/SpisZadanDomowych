@@ -32,7 +32,6 @@ class Przedmioty(Enum):
     BIOLOGIA = "Biologia", "🐟", "🍃"
     GEOGRAFIA = "Geografia", "🌍"
     WYCHOWAWCZA = "Godzina wychowawcza", "✏️"
-    INNY = "Inne", "❓"
 
     def __reduce_ex__(self, protocol):
         """Pozwala na skuteczniejsze pamięciowo picklowanie przedmiotów poprzez zapamiętanie tylko nazwy"""

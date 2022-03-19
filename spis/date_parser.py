@@ -4,7 +4,7 @@ from logging import getLogger
 from dateutil.parser import parserinfo, ParserError, parser
 from dateutil.relativedelta import relativedelta
 
-__all__ = "PolskiDateParser",
+__all__ = "PolskiDateParser", "ParserError"
 logger = getLogger(__name__)
 
 

@@ -26,10 +26,15 @@ class KomendyGlobalne(Cog):
     ):
         """Wyświetla aktualny stan spisu"""
         wyswietl_wszystkim = wyswietl_wszystkim == "Tak"  # Cast na bool
-        await ctx.respond("to jeszcze nie jest zaimplementowane lol", ephemeral=not wyswietl_wszystkim)
+        await ctx.respond(repr(self.bot.stan.lista_zadan), ephemeral=not wyswietl_wszystkim)
 
         self.bot.stan.uzycia_spis += 1
         logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił spis")
+
+    @commands.slash_command()
+    async def s(self, ctx: commands.ApplicationContext):
+        """Alias dla /spis"""
+        await self.spis(ctx, "Nie (domyślnie)")
 
     @commands.slash_command()
     async def info(self, ctx: commands.ApplicationContext):
