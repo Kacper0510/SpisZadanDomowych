@@ -102,7 +102,7 @@ class KomendyDlaEdytorow(Cog):
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
         await ctx.respond(**styl.formatuj_ogloszenie("Dodano nowe ogłoszenie!", nowe_ogloszenie))
 
-    @commands.slash_command()
+    @commands.slash_command(permissions=wlasciciel)
     async def usun(
             self,
             ctx: commands.ApplicationContext,

@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import re
+from datetime import datetime, timedelta, date
 from logging import getLogger
 
 from dateutil.parser import parserinfo, ParserError, parser
@@ -6,6 +7,8 @@ from dateutil.relativedelta import relativedelta
 
 __all__ = "PolskiDateParser", "ParserError"
 logger = getLogger(__name__)
+
+JUTRO_REGEX = re.compile("jutro", re.IGNORECASE)  # Regex do znajdowania słowa "jutro" w tekście
 
 
 class _PolskiDateParser(parserinfo, parser):
@@ -84,6 +87,8 @@ class _PolskiDateParser(parserinfo, parser):
     def parse(self, timestr, default=None, ignoretz=False, tzinfos=None, **kwargs) -> tuple[datetime, datetime]:
         """Nadpisanie parser.parse - zwraca dwie daty zamiast jednej.
         Pierwszy datetime to prawdziwa data podana przez użytkownika, a drugi - zmodyfikowana data usunięcia zadania."""
+        # Zamiana "jutro" na odpowiednią datę z zachowaniem pozostałych parametrów
+        timestr = JUTRO_REGEX.sub((date.today() + timedelta(days=1)).strftime("%d.%m.%y"), timestr)
 
         # Kod skopiowany w większości z oryginalnej implementacji
         if default is None:

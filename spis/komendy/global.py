@@ -35,7 +35,7 @@ class KomendyGlobalne(Cog):
 
     @commands.slash_command()
     async def s(self, ctx: commands.ApplicationContext):
-        """Alias dla /spis"""
+        """Alias komendy /spis"""
         await self.spis(ctx, "Nie (domyślnie)")
 
     @commands.slash_command()
