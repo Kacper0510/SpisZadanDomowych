@@ -5,6 +5,8 @@ from typing import Callable
 from ..date_parser import PolskiDateParser
 from ..przedmiot import Przedmioty
 
+__all__ = "STYLE_DATY", "STYLE_CZASU", "STYLE_EMOJI", "STYLE_OPRACOWANIA"
+
 STYLE_DATY: dict[str, Callable[[datetime], str]] = {
     "Zwykły tekst (domyślny)": lambda d: f"\n{PolskiDateParser.WEEKDAYS[d.weekday()][1].capitalize()}, "
                                          f"{d.day} {PolskiDateParser.MONTHS[d.month - 1][1]}"
