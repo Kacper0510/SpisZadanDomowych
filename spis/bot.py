@@ -25,9 +25,10 @@ class StanBota:
     """Klasa przechowująca stan bota między uruchomieniami"""
 
     lista_zadan: SortedList[Ogloszenie] = field(default_factory=SortedList)
+    style: dict[int, Styl] = field(default_factory=dict)  # Styl każdego użytkownika
+
     ostatni_zapis: datetime = field(default_factory=datetime.now)
     uzycia_spis: int = 0  # Globalna ilość użyć /spis
-    style: dict[int, Styl] = field(default_factory=dict)  # Styl każdego użytkownika
     # edytor: tuple[int, int] | None = None  # ID roli edytora i serwera, na którym ta rola istnieje
     edytor: tuple[int, int] | None = 931891996577103892, 885830592665628702  # TODO zamienić na powyższe (kiedyś)
 
@@ -35,9 +36,9 @@ class StanBota:
         """Zwraca hash stanu"""
         dane_do_hashowania: tuple = (
             tuple(self.lista_zadan),
+            frozenset(self.style.items()),
             self.ostatni_zapis,
             self.uzycia_spis,
-            frozenset(self.style.items()),
             self.edytor
         )
         return hash(dane_do_hashowania)
@@ -56,14 +57,18 @@ class SpisBot(discord.Bot):
         """Inicjalizacja zmiennych"""
         super().__init__(*args, **kwargs)
 
-        self.backup_kanal: discord.DMChannel | None = None  # Kanał do zapisywania/backupowania/wczytywania stanu spisu
         self.stan: StanBota | None = None
-        self.hash_stanu: int = 0  # Hash stanu bota przy ostatnim zapisie/wczytaniu
+
+        # Konfiguracja
         self.autosave: bool = True  # Auto-zapis przy wyłączaniu i auto-wczytywanie przy włączaniu
         self.serwer_dev: int | None = None  # Serwer do zarejestrowania komend developerskich
+
+        # Dane uzupełniane przy inicjalizacji
+        self.backup_kanal: discord.DMChannel | None = None  # Kanał do zapisywania/backupowania/wczytywania stanu spisu
+        self.hash_stanu: int = 0  # Hash stanu bota przy ostatnim zapisie/wczytaniu
         self.czas_startu = datetime.now()  # Czas startu bota, do obliczania uptime
         self.invite_link: str = ""  # Link do zaproszenia bota na serwer
-        self.ostatni_commit: str = ""
+        self.ostatni_commit: str = ""  # Ostatnia aktualizacja bota
 
     async def zapisz(self) -> bool:
         """Zapisuje stan bota do pliku i wysyła go do twórcy bota.

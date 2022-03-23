@@ -19,16 +19,16 @@ class Styl(ABC):
     id: bool = False  # Wyświetlanie ID
     nazwa_przedmiotu: bool = True  # Wyświetlanie nazwy przedmiotu
     emoji: str = next(iter(STYLE_EMOJI))  # Sposób wyświetlania emoji przy przedmiocie
-    opracowanie: str = STYLE_OPRACOWANIA[0]  # Sposób wyświetlania opracowania
+    opracowanie: StylOpracowania = StylOpracowania.NA_DOLE  # Sposób wyświetlania opracowania
 
     @abstractmethod
     def formatuj_spis(self, spis: SortedList[Ogloszenie]) -> dict[str, Any]:
         pass
 
     @abstractmethod
-    def formatuj_zadanie(self, naglowek: str, zadanie: ZadanieDomowe) -> dict[str, Any]:
+    def formatuj_zadanie(self, naglowek: str, zadanie: ZadanieDomowe, *, wymus_id: bool = False) -> dict[str, Any]:
         pass
 
     @abstractmethod
-    def formatuj_ogloszenie(self, naglowek: str, ogloszenie: Ogloszenie) -> dict[str, Any]:
+    def formatuj_ogloszenie(self, naglowek: str, ogloszenie: Ogloszenie, *, wymus_id: bool = False) -> dict[str, Any]:
         pass

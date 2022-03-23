@@ -1,11 +1,12 @@
 import random
 from datetime import datetime, date
+from enum import Enum
 from typing import Callable
 
 from ..date_parser import PolskiDateParser
 from ..przedmiot import Przedmioty
 
-__all__ = "STYLE_DATY", "STYLE_CZASU", "STYLE_EMOJI", "STYLE_OPRACOWANIA"
+__all__ = "STYLE_DATY", "STYLE_CZASU", "STYLE_EMOJI", "StylOpracowania"
 
 STYLE_DATY: dict[str, Callable[[datetime], str]] = {
     "Zwykły tekst (domyślny)": lambda d: f"\n{PolskiDateParser.WEEKDAYS[d.weekday()][1].capitalize()}, "
@@ -30,9 +31,9 @@ STYLE_EMOJI: dict[str, Callable[[Przedmioty], str]] = {
     "Nie wyświetlaj": lambda p: ""
 }
 
-STYLE_OPRACOWANIA: list[str] = [
-    "Pod spisem (domyślnie)",
-    "Przy każdym zadaniu",
-    "Przy każdym zadaniu (z datą utworzenia)",
-    "Nie wyświetlaj opracowania"
-]
+
+class StylOpracowania(Enum):
+    NA_DOLE = "Pod spisem (domyślnie)"
+    OBOK = "Przy każdym zadaniu"
+    OBOK_DATA = "Przy każdym zadaniu (z datą utworzenia)"
+    BRAK = "Nie wyświetlaj opracowania"

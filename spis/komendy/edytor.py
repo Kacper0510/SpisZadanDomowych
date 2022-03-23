@@ -65,7 +65,7 @@ class KomendyDlaEdytorow(Cog):
         logger.info(f"Dodano nowe zadanie: {repr(nowe_zadanie)}")
 
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
-        await ctx.respond(**styl.formatuj_zadanie("Dodano nowe zadanie!", nowe_zadanie))
+        await ctx.respond(**styl.formatuj_zadanie("Dodano nowe zadanie!", nowe_zadanie, wymus_id=True))
 
     @dodaj.command()
     async def ogloszenie(
@@ -100,7 +100,7 @@ class KomendyDlaEdytorow(Cog):
         logger.info(f"Dodano nowe ogłoszenie: {repr(nowe_ogloszenie)}")
 
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
-        await ctx.respond(**styl.formatuj_ogloszenie("Dodano nowe ogłoszenie!", nowe_ogloszenie))
+        await ctx.respond(**styl.formatuj_ogloszenie("Dodano nowe ogłoszenie!", nowe_ogloszenie, wymus_id=True))
 
     @commands.slash_command(permissions=wlasciciel)
     async def usun(

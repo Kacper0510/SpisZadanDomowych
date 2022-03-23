@@ -18,14 +18,14 @@ ZNACZNIK_UCIECIA_TEKSTU = "\n```\n...```"  # Symbolizuje osiągnięcie limitu 20
 class StandardowyStyl(Styl):
     """Styl wyświetlania jako zwykły tekst z Markdownem"""
 
-    def opracowanie_przy_zadaniu(self, zadanie: Ogloszenie) -> str:
+    def opracowanie_przy_zadaniu(self, zadanie: Ogloszenie) -> str | None:
         """Zwraca opracowanie wyświetlane przy zadaniu/ogłoszeniu, jeśli użytkownik ma je włączone"""
-        if self.opracowanie == "Przy każdym zadaniu":
+        if self.opracowanie == StylOpracowania.OBOK:
             return f"dodane przez: <@{zadanie.utworzono[0]}>"
-        elif self.opracowanie == "Przy każdym zadaniu (z datą utworzenia)":
+        elif self.opracowanie == StylOpracowania.OBOK_DATA:
             return f"dodane przez: <@{zadanie.utworzono[0]}> ({STYLE_DATY[self.data](zadanie.utworzono[1])[:-2]})"
         else:
-            return ""
+            return None
 
     def formatuj_tresc_zadania(self, zadanie: ZadanieDomowe) -> str:
         """Formatuje samą treść zadania"""
@@ -80,7 +80,7 @@ class StandardowyStyl(Styl):
                 wynik += zadanie
             if len(wynik) >= 2000:  # Ucięcie pętli, aby nie marnować czasu, gdy osiągnięto już i tak limit
                 break
-        if self.opracowanie == "Pod spisem (domyślnie)":  # Dodanie opracowania z wszystkimi twórcami aktualnych zadań
+        if self.opracowanie == StylOpracowania.NA_DOLE:  # Dodanie opracowania z wszystkimi twórcami aktualnych zadań
             opracowanie = "\nOpracowanie spisu:\n"
             opracowanie += ", ".join({f"<@{z.utworzono[0]}>" for z in spis})  # Set comprehension
             if len(wynik) + len(opracowanie) < 2000:  # Znowu limity Discorda
@@ -95,10 +95,24 @@ class StandardowyStyl(Styl):
             wynik += ZNACZNIK_UCIECIA_TEKSTU
         return {"content": wynik}
 
-    def formatuj_zadanie(self, naglowek: str, zadanie: ZadanieDomowe) -> dict[str, Any]:
+    def formatuj_zadanie(self, naglowek: str, zadanie: ZadanieDomowe, *, wymus_id: bool = False) -> dict[str, Any]:
+        if wymus_id:
+            poprzednie_ustawienie_id = self.id
+            self.id = True
+            tresc = self.formatuj_tresc_zadania(zadanie)
+            self.id = poprzednie_ustawienie_id
+        else:
+            tresc = self.formatuj_tresc_zadania(zadanie)
         return {"content": f"{naglowek}\n"
                            f"{STYLE_DATY[self.data](zadanie.prawdziwy_termin)}"
-                           f"{self.formatuj_tresc_zadania(zadanie)}"}
+                           f"{tresc}"}
 
-    def formatuj_ogloszenie(self, naglowek: str, ogloszenie: Ogloszenie) -> dict[str, Any]:
-        return {"content": f"{naglowek}\n\n{self.formatuj_tresc_ogloszenia(ogloszenie)}"}
+    def formatuj_ogloszenie(self, naglowek: str, ogloszenie: Ogloszenie, *, wymus_id: bool = False) -> dict[str, Any]:
+        if wymus_id:
+            poprzednie_ustawienie_id = self.id
+            self.id = True
+            tresc = self.formatuj_tresc_ogloszenia(ogloszenie)
+            self.id = poprzednie_ustawienie_id
+        else:
+            tresc = self.formatuj_tresc_ogloszenia(ogloszenie)
+        return {"content": f"{naglowek}\n\n{tresc}"}
