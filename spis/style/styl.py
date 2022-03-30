@@ -10,7 +10,7 @@ from ..zadanie import *
 __all__ = "Styl",
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Styl(ABC):
     """Przechowuje ustawienia stylu wyświetlania spisu dla danego użytkownika"""
 

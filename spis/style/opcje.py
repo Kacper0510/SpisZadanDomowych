@@ -37,3 +37,7 @@ class StylOpracowania(Enum):
     OBOK = "Przy każdym zadaniu"
     OBOK_DATA = "Przy każdym zadaniu (z datą utworzenia)"
     BRAK = "Nie wyświetlaj opracowania"
+
+    def __reduce_ex__(self, protocol):
+        """Pozwala na skuteczniejsze pamięciowo picklowanie poprzez zapamiętanie tylko nazwy"""
+        return getattr, (self.__class__, self.name)

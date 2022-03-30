@@ -33,10 +33,11 @@ class KomendyGlobalne(Cog):
         self.bot.stan.uzycia_spis += 1
         logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił spis")
 
-    @commands.slash_command()
-    async def s(self, ctx: commands.ApplicationContext):
-        """Alias komendy /spis"""
-        await self.spis(ctx, "Nie (domyślnie)")
+    # # Jednak nie działa to tak dobrze, jak chciałem...
+    # @commands.slash_command()
+    # async def s(self, ctx: commands.ApplicationContext):
+    #     """Alias komendy /spis"""
+    #     await self.spis(ctx, "Nie (domyślnie)")
 
     @commands.slash_command()
     async def info(self, ctx: commands.ApplicationContext):
