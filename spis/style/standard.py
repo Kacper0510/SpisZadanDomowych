@@ -1,5 +1,4 @@
 import datetime
-from dataclasses import dataclass
 from logging import getLogger
 from typing import Any
 
@@ -14,7 +13,6 @@ logger = getLogger(__name__)
 ZNACZNIK_UCIECIA_TEKSTU = "\n```\n...```"  # Symbolizuje osiągnięcie limitu 2000 znaków przy wyświetlaniu spisu
 
 
-@dataclass
 class StandardowyStyl(Styl):
     """Styl wyświetlania jako zwykły tekst z Markdownem"""
 
