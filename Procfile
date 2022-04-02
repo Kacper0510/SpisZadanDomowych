@@ -1,1 +1,1 @@
-worker: python spis.py
+worker: python -m spis
