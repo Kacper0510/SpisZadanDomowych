@@ -1,3 +1,3 @@
 python-dateutil>=2.8.2
-git+https://github.com/Pycord-Development/pycord.git@b5f6ad6403d2cea1ce6e2625f2a887e7e2725e58
+py-cord==2.0.0b7
 sortedcontainers>=2.4.0

@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 from logging import getLogger
-from typing import List
 
 import aiohttp
 import discord
@@ -45,12 +44,6 @@ class StanBota:
 
 class SpisBot(discord.Bot):
     """Rozszerzenie podstawowego bota o potrzebne metody"""
-
-    async def register_command(self, command: discord.ApplicationCommand, force: bool = True,
-                               guild_ids: List[int] = None) -> None:
-        """Musiałem to zaimplementować, bo nie chciało się tego zrobić twórcom pycorda..."""
-        for guild in guild_ids:
-            await self.register_commands([command], guild, force)
 
     def __init__(self, *args, **kwargs):
         """Inicjalizacja zmiennych"""

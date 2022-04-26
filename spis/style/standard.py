@@ -65,7 +65,7 @@ class StandardowyStyl(Styl):
         ogloszenia = False  # Czy w trakcie układania wyniku zaczęto już zapisywać ogłoszenia (zawsze po zadaniach)?
         problem_z_dlugoscia = False  # True, gdy w pewnym momencie układania spisu osiągnięto limit 2000 znaków
         for z in spis:
-            if type(z) != ZadanieDomowe:
+            if type(z) != ZadanieDomowe and not ogloszenia:  # Nagłówek ma być wypisany tylko raz
                 ogloszenia = True
                 wynik += "\nOgłoszenia:\n"
             if ogloszenia:  # Jeśli aktualny element spisu (i każdy kolejny) jest ogłoszeniem

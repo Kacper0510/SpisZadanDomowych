@@ -106,14 +106,14 @@ class KomendyDlaEdytorow(Cog):
     async def usun(
             self,
             ctx: commands.ApplicationContext,
-            id_zadania: commands.Option(str, "ID zadania/ogłoszenia do usunięcia")
+            id_do_usuniecia: commands.Option(str, "ID zadania/ogłoszenia do usunięcia")
     ):
         """Usuwa zadanie lub ogłoszenie o podanym ID ze spisu"""
-        id_zadania = id_zadania.lower()
-        znaleziono = utils.get(self.bot.stan.lista_zadan, id=id_zadania)
+        id_do_usuniecia = id_do_usuniecia.lower()
+        znaleziono = utils.get(self.bot.stan.lista_zadan, id=id_do_usuniecia)
 
         if not znaleziono:
-            logger.debug(f'Użytkownik {repr(ctx.author)} chciał usunąć nieistniejące ID: {repr(id_zadania)}')
+            logger.debug(f'Użytkownik {repr(ctx.author)} chciał usunąć nieistniejące ID: {repr(id_do_usuniecia)}')
             await ctx.respond("Nie znaleziono zadania/ogłoszenia o podanym ID!")
             return
 
