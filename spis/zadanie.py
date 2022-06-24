@@ -24,7 +24,7 @@ class Ogloszenie:
     tresc: str
     utworzono: tuple[int, datetime]  # Zawiera ID autora i datę utworzenia
     id: str = field(init=False, hash=False)
-    task: tasks.Loop = field(init=False, hash=False, repr=False)
+    task: tasks.Loop | None = field(init=False, hash=False, repr=False)
 
     @staticmethod
     def popraw_linki(tekst: str) -> str:
@@ -39,6 +39,9 @@ class Ogloszenie:
         """Tworzy task, którego celem jest usunięcie danego zadania domowego po upłynięciu jego terminu"""
 
         termin = (self.termin_usuniecia - datetime.now()).total_seconds()
+        if termin <= 0:  # Data w przeszłości
+            self.task = None
+            return
 
         # Wykonaj 2 razy, raz po utworzeniu, raz po upłynięciu czasu
         @tasks.loop(seconds=termin, count=2)
@@ -73,7 +76,8 @@ class Ogloszenie:
 
     def __del__(self):
         """Przy destrukcji obiektu anuluje jego task"""
-        self.task.cancel()
+        if self.task is not None:
+            self.task.cancel()
 
     def __getstate__(self) -> tuple:
         """Zapisuje w pickle wszystkie dane ogłoszenia oprócz taska"""

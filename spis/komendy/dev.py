@@ -1,6 +1,6 @@
 from logging import getLogger
 
-from discord import commands, Cog
+from discord import commands, Cog, Permissions
 
 from ..bot import SpisBot
 
@@ -15,7 +15,7 @@ class KomendyDeveloperskie(Cog):
             self.__cog_commands__[0].guild_ids = [bot.serwer_dev]  # Nadpisanie guild_ids dla dev
 
     dev = commands.SlashCommandGroup("dev", "Komendy developerskie",
-                                     permissions=[commands.CommandPermission("owner", 2, True)])
+                                     default_member_permissions=Permissions(1 << 3))  # ADMINISTRATOR
 
     @dev.command()
     async def zapisz(self, ctx: commands.ApplicationContext):

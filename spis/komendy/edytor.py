@@ -1,7 +1,7 @@
 from datetime import datetime
 from logging import getLogger
 
-from discord import commands, Cog, utils
+from discord import commands, Cog, utils, Permissions
 
 from ..bot import SpisBot, PROSTY_FORMAT_DATY
 from ..date_parser import *
@@ -12,19 +12,20 @@ from ..zadanie import *
 logger = getLogger(__name__)
 
 LIMIT_ZNAKOW = 250  # Limit znaków w ogłoszeniu/zadaniu domowym
-wlasciciel = [commands.CommandPermission("owner", 2, True)]
 
 
 class KomendyDlaEdytorow(Cog):
+    """Domyślnie tych komend mogą używać osoby z uprawnieniem zarządzania wiadomościami
+    na serwerze wybranym poprzez komendę developerską."""
 
     def __init__(self, bot: SpisBot):
         self.bot = bot
         if bot.stan.edytor is not None:
             for cmd in self.__cog_commands__:
-                cmd.guild_ids = [bot.stan.edytor[1]]
-                cmd.permissions.append(commands.CommandPermission(bot.stan.edytor[0], 1, True, bot.stan.edytor[1]))
+                cmd.guild_ids = [bot.stan.edytor]
 
-    dodaj = commands.SlashCommandGroup("dodaj", "Komendy dodające ogłoszenia i zadania", permissions=wlasciciel)
+    dodaj = commands.SlashCommandGroup("dodaj", "Komendy dodające ogłoszenia i zadania",
+                                       default_member_permissions=Permissions(1 << 13))  # MANAGE_MESSAGES
 
     @dodaj.command()
     async def zadanie(
@@ -102,7 +103,7 @@ class KomendyDlaEdytorow(Cog):
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
         await ctx.respond(**styl.formatuj_ogloszenie("Dodano nowe ogłoszenie!", nowe_ogloszenie, wymus_id=True))
 
-    @commands.slash_command(permissions=wlasciciel)
+    @commands.slash_command(default_member_permissions=Permissions(1 << 13))  # MANAGE_MESSAGES
     async def usun(
             self,
             ctx: commands.ApplicationContext,

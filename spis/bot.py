@@ -28,7 +28,7 @@ class StanBota:
 
     ostatni_zapis: datetime = field(default_factory=datetime.now)
     uzycia_spis: int = 0  # Globalna ilość użyć /spis
-    edytor: tuple[int, int] | None = None  # ID roli edytora i serwera, na którym ta rola istnieje
+    edytor: int | None = None  # ID serwera, na którym można edytować spis
 
     def __hash__(self):
         """Zwraca hash stanu"""

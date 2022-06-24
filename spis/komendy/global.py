@@ -58,10 +58,10 @@ class KomendyGlobalne(Cog):
         if kropka := uptime.find("."):  # Pozbywamy się mikrosekund
             uptime = uptime[:kropka]
         embed.add_field(name="Czas pracy", value=uptime)
-        embed.add_field(name="Serwery", value=len(self.bot.guilds))
+        embed.add_field(name="Serwery", value=str(len(self.bot.guilds)))
 
         embed.add_field(name="Ostatni backup", value=f"<t:{round(self.bot.stan.ostatni_zapis.timestamp())}:R>")
-        embed.add_field(name="Globalna ilość użyć `/spis`", value=self.bot.stan.uzycia_spis)
+        embed.add_field(name="Globalna ilość użyć `/spis`", value=str(self.bot.stan.uzycia_spis))
 
         if self.bot.ostatni_commit:
             embed.add_field(name="Ostatnia aktualizacja", value=self.bot.ostatni_commit, inline=False)
