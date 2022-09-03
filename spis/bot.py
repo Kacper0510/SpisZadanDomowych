@@ -75,8 +75,8 @@ class SpisBot(discord.Bot):
             backup = pickle.dumps(self.stan, pickle.HIGHEST_PROTOCOL)
             plik = discord.File(BytesIO(backup), f"spis_backup_{round(self.stan.ostatni_zapis.timestamp())}.pickle")
             await self.backup_kanal.send("", file=plik)
-            logger.info(f"Pomyślnie zapisano plik {plik.filename} na kanale {repr(self.backup_kanal)}")
-            logger.debug(f"Zapisane dane: {repr(self.stan)}")
+            logger.info(f"Pomyślnie zapisano plik {plik.filename} na kanale {self.backup_kanal!r}")
+            logger.debug(f"Zapisane dane: {self.stan!r}")
             return True
         except pickle.PickleError as e:
             logger.exception("Nie udało się zapisać stanu jako obiekt pickle!", exc_info=e)
@@ -90,7 +90,7 @@ class SpisBot(discord.Bot):
         try:
             ostatnia_wiadomosc = (await self.backup_kanal.history(limit=1).flatten())[0]
             if len(ostatnia_wiadomosc.attachments) != 1:
-                logger.warning(f"Ostatnia wiadomość na kanale {repr(self.backup_kanal)} miała złą ilość załączników, "
+                logger.warning(f"Ostatnia wiadomość na kanale {self.backup_kanal!r} miała złą ilość załączników, "
                                f"porzucono wczytywanie stanu!")
                 return False
             dane = await ostatnia_wiadomosc.attachments[0].read()
@@ -102,8 +102,8 @@ class SpisBot(discord.Bot):
                     self.stan.lista_zadan.remove(zadanie)
 
             logger.info(f"Pomyślnie wczytano backup z {self.stan.ostatni_zapis.strftime(PROSTY_FORMAT_DATY)} "
-                        f"z kanału {repr(self.backup_kanal)}")
-            logger.debug(f"Zapisane dane: {repr(self.stan)}")
+                        f"z kanału {self.backup_kanal!r}")
+            logger.debug(f"Zapisane dane: {self.stan!r}")
             return True
         except (pickle.PickleError, IndexError) as e:
             logger.exception("Nie udało się wczytać pliku pickle!", exc_info=e)
@@ -157,7 +157,7 @@ class SpisBot(discord.Bot):
     # noinspection PyMethodMayBeStatic
     async def on_guild_join(self, guild):
         """Wywoływane, gdy bota dodano do serwera"""
-        logger.info(f"Bot został dodany do serwera {repr(guild)}")
+        logger.info(f"Bot został dodany do serwera {guild!r}")
 
     async def close(self):
         """Zamyka bota zapisując jego stan"""

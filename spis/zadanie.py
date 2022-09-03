@@ -32,7 +32,7 @@ class Ogloszenie:
         Zasada działania: gdy link znajduje się w nawiasach ostrokątnych, nie generuje on embedów."""
         # \1 oznacza backtracking do 1 grupy każdego matcha, czyli do całego linku
         ret = LINK_REGEX.sub(r"<\1>", tekst)
-        logger.debug(f'Poprawianie linków: {repr(tekst)} na {repr(ret)}')
+        logger.debug(f'Poprawianie linków: {tekst!r} na {ret!r}')
         return ret
 
     def stworz_task(self):

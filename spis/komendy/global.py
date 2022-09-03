@@ -31,7 +31,7 @@ class KomendyGlobalne(Cog):
         await ctx.respond(**styl.formatuj_spis(self.bot.stan.lista_zadan), ephemeral=not wyswietl_wszystkim)
 
         self.bot.stan.uzycia_spis += 1
-        logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił spis")
+        logger.debug(f"Użytkownik {ctx.author!r} wyświetlił spis")
 
     # # Jednak nie działa to tak dobrze, jak chciałem...
     # @commands.slash_command()
@@ -82,7 +82,7 @@ class KomendyGlobalne(Cog):
         )
 
         await ctx.respond(embed=embed, ephemeral=True, view=przyciski)
-        logger.debug(f"Użytkownik {repr(ctx.author)} wyświetlił informacje o bocie")
+        logger.debug(f"Użytkownik {ctx.author!r} wyświetlił informacje o bocie")
 
 
 def setup(bot: SpisBot):

@@ -47,12 +47,12 @@ class KomendyDlaEdytorow(Cog):
             # Konwertuje datę/godzinę podaną przez użytkownika na dwa datetime'y
             data_p, data_u = PolskiDateParser.parse(termin)
             if data_p < datetime.now():
-                logger.debug(f'Użytkownik {repr(ctx.author)} podał datę z przeszłości: '
-                             f'{repr(termin)} -> {data_p.strftime(PROSTY_FORMAT_DATY)}')
+                logger.debug(f'Użytkownik {ctx.author!r} podał datę z przeszłości: '
+                             f'{termin!r} -> {data_p.strftime(PROSTY_FORMAT_DATY)}')
                 await ctx.respond("Zadanie nie zostało zarejestrowane, ponieważ podano datę z przeszłości!")
                 return
         except (ParserError, ValueError) as e:
-            logger.debug(f'Użytkownik {repr(ctx.author)} podał datę w niepoprawnym formacie: {termin!r}', exc_info=e)
+            logger.debug(f'Użytkownik {ctx.author!r} podał datę w niepoprawnym formacie: {termin!r}', exc_info=e)
             await ctx.respond("Wystąpił błąd przy konwersji daty!")
             return
 
@@ -60,7 +60,7 @@ class KomendyDlaEdytorow(Cog):
         nowe_zadanie = ZadanieDomowe(data_u, opis, (ctx.author.id, datetime.now()),
                                      Przedmioty.lista()[przedmiot], data_p)
         self.bot.stan.lista_zadan.add(nowe_zadanie)
-        logger.info(f"Dodano nowe zadanie: {repr(nowe_zadanie)}")
+        logger.info(f"Dodano nowe zadanie: {nowe_zadanie!r}")
 
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
         await ctx.respond(**styl.formatuj_zadanie("Dodano nowe zadanie!", nowe_zadanie, wymus_id=True))
@@ -83,19 +83,19 @@ class KomendyDlaEdytorow(Cog):
             # Konwertuje datę/godzinę podaną przez użytkownika na dwa datetime'y
             data_p = PolskiDateParser.parse(termin)[0]
             if data_p < datetime.now():
-                logger.debug(f'Użytkownik {repr(ctx.author)} podał datę z przeszłości: '
-                             f'{repr(termin)} -> {data_p.strftime(PROSTY_FORMAT_DATY)}')
+                logger.debug(f'Użytkownik {ctx.author!r} podał datę z przeszłości: '
+                             f'{termin!r} -> {data_p.strftime(PROSTY_FORMAT_DATY)}')
                 await ctx.respond("Ogłoszenie nie zostało zarejestrowane, ponieważ podano datę z przeszłości!")
                 return
         except (ParserError, ValueError) as e:
-            logger.debug(f'Użytkownik {repr(ctx.author)} podał datę w niepoprawnym formacie: {termin!r}', exc_info=e)
+            logger.debug(f'Użytkownik {ctx.author!r} podał datę w niepoprawnym formacie: {termin!r}', exc_info=e)
             await ctx.respond("Wystąpił błąd przy konwersji daty!")
             return
 
         # Tworzy obiekt zadania i dodaje do spisu
         nowe_ogloszenie = Ogloszenie(data_p, opis, (ctx.author.id, datetime.now()))
         self.bot.stan.lista_zadan.add(nowe_ogloszenie)
-        logger.info(f"Dodano nowe ogłoszenie: {repr(nowe_ogloszenie)}")
+        logger.info(f"Dodano nowe ogłoszenie: {nowe_ogloszenie!r}")
 
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
         await ctx.respond(**styl.formatuj_ogloszenie("Dodano nowe ogłoszenie!", nowe_ogloszenie, wymus_id=True))
@@ -111,13 +111,13 @@ class KomendyDlaEdytorow(Cog):
         znaleziono = utils.get(self.bot.stan.lista_zadan, id=id_do_usuniecia)
 
         if not znaleziono:
-            logger.debug(f'Użytkownik {repr(ctx.author)} chciał usunąć nieistniejące ID: {repr(id_do_usuniecia)}')
+            logger.debug(f'Użytkownik {ctx.author!r} chciał usunąć nieistniejące ID: {id_do_usuniecia!r}')
             await ctx.respond("Nie znaleziono zadania/ogłoszenia o podanym ID!")
             return
 
         znaleziono.task.cancel()
         self.bot.stan.lista_zadan.remove(znaleziono)
-        logger.info(f'Użytkownik {repr(ctx.author)} usunął zadanie/ogłoszenie: {repr(znaleziono)}')
+        logger.info(f'Użytkownik {ctx.author!r} usunął zadanie/ogłoszenie: {znaleziono!r}')
 
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
         if isinstance(znaleziono, ZadanieDomowe):
