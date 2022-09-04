@@ -20,10 +20,9 @@ class StandardowyStyl(Styl):
         """Zwraca opracowanie wyświetlane przy zadaniu/ogłoszeniu, jeśli użytkownik ma je włączone"""
         if self.opracowanie == StylOpracowania.OBOK:
             return f"dodane przez: <@{zadanie.utworzono[0]}>"
-        elif self.opracowanie == StylOpracowania.OBOK_DATA:
+        if self.opracowanie == StylOpracowania.OBOK_DATA:
             return f"dodane przez: <@{zadanie.utworzono[0]}> ({STYLE_DATY[self.data](zadanie.utworzono[1])[:-2]})"
-        else:
-            return None
+        return None
 
     def formatuj_tresc_zadania(self, zadanie: ZadanieDomowe) -> str:
         """Formatuje samą treść zadania"""

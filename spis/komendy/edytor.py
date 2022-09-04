@@ -1,5 +1,6 @@
 from datetime import datetime
 from logging import getLogger
+from typing import cast
 
 from discord import commands, Cog, utils
 
@@ -23,9 +24,10 @@ class KomendyDlaEdytorow(Cog):
                 cmd.guild_ids = [bot.stan.edytor]
 
     dodaj = commands.SlashCommandGroup("dodaj", "Komendy dodające ogłoszenia i zadania")
+    edytuj = commands.SlashCommandGroup("edytuj", "Komendy edytujące ogłoszenia i zadania")
 
-    @dodaj.command()
-    async def zadanie(
+    @dodaj.command(name="zadanie")
+    async def dodaj_zadanie(
             self,
             ctx: commands.ApplicationContext,
             opis: commands.Option(str, "Treść zadania domowego"),
@@ -65,8 +67,8 @@ class KomendyDlaEdytorow(Cog):
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
         await ctx.respond(**styl.formatuj_zadanie("Dodano nowe zadanie!", nowe_zadanie, wymus_id=True))
 
-    @dodaj.command()
-    async def ogloszenie(
+    @dodaj.command(name="ogloszenie")
+    async def dodaj_ogloszenie(
             self,
             ctx: commands.ApplicationContext,
             opis: commands.Option(str, "Treść ogłoszenia"),
@@ -99,6 +101,133 @@ class KomendyDlaEdytorow(Cog):
 
         styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
         await ctx.respond(**styl.formatuj_ogloszenie("Dodano nowe ogłoszenie!", nowe_ogloszenie, wymus_id=True))
+
+    @edytuj.command(name="zadanie")
+    async def edytuj_zadanie(
+            self,
+            ctx: commands.ApplicationContext,
+            id_do_edycji: commands.Option(str, "ID zadania/ogłoszenia do edycji"),
+            opis: commands.Option(str, "Treść zadania domowego") = None,
+            termin: commands.Option(
+                str,
+                "Termin zadania domowego, np.: 'poniedziałek', 'pt 23:59', '21 III 2022'"
+            ) = None,
+            przedmiot: commands.Option(
+                str,
+                "Przedmiot szkolny, z którego zadane jest zadanie",
+                choices=Przedmioty.lista().keys()
+            ) = None
+    ):
+        """Edytuje zadanie o podanym ID"""
+        id_do_edycji = id_do_edycji.lower()
+        znaleziono = utils.get(self.bot.stan.lista_zadan, id=id_do_edycji)
+
+        if not znaleziono or type(znaleziono) != ZadanieDomowe:
+            logger.debug(f'Użytkownik {ctx.author!r} chciał edytować nieistniejące zadanie: {id_do_edycji!r}')
+            await ctx.respond("Nie znaleziono zadania o podanym ID!")
+            return
+        znaleziono = cast(ZadanieDomowe, znaleziono)
+
+        zmiany = []
+        if opis is not None:
+            if len(opis) > LIMIT_ZNAKOW:
+                await ctx.respond(f"Za długa treść zadania!\nLimit znaków: {LIMIT_ZNAKOW}")
+                return
+            zmiany.append("opis")
+        data_p, data_u = None, None
+        if termin is not None:
+            try:
+                # Konwertuje datę/godzinę podaną przez użytkownika na dwa datetime'y
+                data_p, data_u = PolskiDateParser.parse(termin)
+                if data_p < datetime.now():
+                    logger.debug(f'Użytkownik {ctx.author!r} podał datę z przeszłości: '
+                                 f'{termin!r} -> {data_p.strftime(PROSTY_FORMAT_DATY)}')
+                    await ctx.respond("Zadanie nie zostało zmienione, ponieważ podano datę z przeszłości!")
+                    return
+                zmiany.append("termin")
+            except (ParserError, ValueError) as e:
+                logger.debug(f'Użytkownik {ctx.author!r} podał datę w niepoprawnym formacie: {termin!r}', exc_info=e)
+                await ctx.respond("Wystąpił błąd przy konwersji daty!")
+                return
+        if przedmiot is not None:
+            zmiany.append("przedmiot")
+
+        if len(zmiany) == 0:
+            logger.debug(f'Użytkownik {ctx.author!r} nic nie zmienił w zadaniu: {znaleziono!r}')
+            await ctx.respond("Nic nie zostało zmienione!")
+            return
+        if "opis" in zmiany:
+            znaleziono.tresc = znaleziono.popraw_linki(opis)
+        if "termin" in zmiany:
+            znaleziono.termin_usuniecia = data_u
+            znaleziono.prawdziwy_termin = data_p
+            znaleziono.task.cancel()
+            znaleziono.stworz_task()
+        if "przedmiot" in zmiany:
+            znaleziono.przedmiot = Przedmioty.lista()[przedmiot]
+
+        logger.info(f'Użytkownik {ctx.author!r} edytował zadanie: {znaleziono!r}')
+
+        styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
+        await ctx.respond(**styl.formatuj_zadanie("Edytowano zadanie!", znaleziono))
+
+    @edytuj.command(name="ogloszenie")
+    async def edytuj_ogloszenie(
+            self,
+            ctx: commands.ApplicationContext,
+            id_do_edycji: commands.Option(str, "ID zadania/ogłoszenia do edycji"),
+            opis: commands.Option(str, "Treść ogłoszenia") = None,
+            termin: commands.Option(
+                str,
+                "Termin usunięcia ogłoszenia, np.: 'poniedziałek', 'pt 23:59', '21 III 2022'"
+            ) = None
+    ):
+        """Edytuje ogłoszenie o podanym ID"""
+        id_do_edycji = id_do_edycji.lower()
+        znaleziono = utils.get(self.bot.stan.lista_zadan, id=id_do_edycji)
+
+        if not znaleziono or type(znaleziono) == ZadanieDomowe:
+            logger.debug(f'Użytkownik {ctx.author!r} chciał edytować nieistniejące ogłoszenie: {id_do_edycji!r}')
+            await ctx.respond("Nie znaleziono ogłoszenia o podanym ID!")
+            return
+
+        zmiany = []
+        if opis is not None:
+            if len(opis) > LIMIT_ZNAKOW:
+                await ctx.respond(f"Za długa treść ogłoszenia!\nLimit znaków: {LIMIT_ZNAKOW}")
+                return
+            zmiany.append("opis")
+        data_p = None
+        if termin is not None:
+            try:
+                # Konwertuje datę/godzinę podaną przez użytkownika na dwa datetime'y
+                data_p = PolskiDateParser.parse(termin)[0]
+                if data_p < datetime.now():
+                    logger.debug(f'Użytkownik {ctx.author!r} podał datę z przeszłości: '
+                                 f'{termin!r} -> {data_p.strftime(PROSTY_FORMAT_DATY)}')
+                    await ctx.respond("Ogłoszenie nie zostało zmienione, ponieważ podano datę z przeszłości!")
+                    return
+                zmiany.append("termin")
+            except (ParserError, ValueError) as e:
+                logger.debug(f'Użytkownik {ctx.author!r} podał datę w niepoprawnym formacie: {termin!r}', exc_info=e)
+                await ctx.respond("Wystąpił błąd przy konwersji daty!")
+                return
+
+        if len(zmiany) == 0:
+            logger.debug(f'Użytkownik {ctx.author!r} nic nie zmienił w ogłoszeniu: {znaleziono!r}')
+            await ctx.respond("Nic nie zostało zmienione!")
+            return
+        if "opis" in zmiany:
+            znaleziono.tresc = znaleziono.popraw_linki(opis)
+        if "termin" in zmiany:
+            znaleziono.termin_usuniecia = data_p
+            znaleziono.task.cancel()
+            znaleziono.stworz_task()
+
+        logger.info(f'Użytkownik {ctx.author!r} edytował ogłoszenie: {znaleziono!r}')
+
+        styl = self.bot.stan.style.get(ctx.author.id, DOMYSLNY_STYL)
+        await ctx.respond(**styl.formatuj_ogloszenie("Edytowano ogłoszenie!", znaleziono))
 
     @commands.slash_command()
     async def usun(

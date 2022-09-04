@@ -37,7 +37,6 @@ class Ogloszenie:
 
     def stworz_task(self):
         """Tworzy task, którego celem jest usunięcie danego zadania domowego po upłynięciu jego terminu"""
-
         termin = (self.termin_usuniecia - datetime.now()).total_seconds()
         if termin <= 0:  # Data w przeszłości
             self.task = None
