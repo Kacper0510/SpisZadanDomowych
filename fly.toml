@@ -1,0 +1,16 @@
+app = "spis-zadan-domowych"
+kill_signal = "SIGTERM"
+kill_timeout = 10
+
+[processes]
+  worker = "python -m spis"
+
+[build]
+  builder = "paketobuildpacks/builder:base"
+  buildpacks = ["gcr.io/paketo-buildpacks/python"]
+  [[build.env]]
+    name = "BP_CPYTHON_VERSION"
+    value = "3.10.*"
+
+[env]
+  TZ = "Europe/Warsaw"
