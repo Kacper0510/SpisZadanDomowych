@@ -19,7 +19,7 @@ class Przedmioty(Enum):
     MATEMATYKA = "Matematyka", "🧮", "📏", "<:krawat:750788981611823156>"
     RELIGIA = "Religia", "✝"
     MATMA_UZUP = "Matematyka uzupełniająca", "🔢", "🔠"
-    INFA_RACZEK = "Informatyka (Raczek)", "🖥️", "<:raczek_wow:940921731332341781>", ""
+    INFA_RACZEK = "Informatyka (Raczek)", "🖥️", "<:raczek_wow:940921731332341781>"
     INFA_HERMA = "Informatyka (Herma)", "💻", "<:herma:811601136741908542>", "<:herma_1_klasa:720881659934802001>"
     NIEMIECKI_BABICZ = "Niemiecki (Babicz)", "🇩🇪"
     NIEMIECKI_SYCH = "Niemiecki (Sych)", "🇩🇪"

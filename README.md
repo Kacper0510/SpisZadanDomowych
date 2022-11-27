@@ -16,10 +16,9 @@ $ python3 -m pip install -r requirements.txt
 Należy następnie ustawić zmienne środowiskowe:
 ```
 Spis_Token = string z Discordowym tokenem
-Spis_Edytor = rola odpowiadająca za edycję spisu (w formacie <id_roli>:<id_serwera>)
-Spis_Dev = rola mająca dostęp do komend developerskich (w formacie <id_roli>:<id_serwera>)
-Spis_Autosave = opcjonalne, prawda|fałsz (domyślnie: prawda)
-Spis_LogLevel = opcjonalne, DEBUG|INFO|WARNING|ERROR|CRITICAL (domyślnie: INFO)
+Spis_Dev = opcjonalne; ID serwera, na którym rejestrowane są komendy developerskie
+Spis_Autosave = opcjonalne; prawda|fałsz (domyślnie: prawda)
+Spis_LogLevel = opcjonalne; DEBUG|INFO|WARNING|ERROR|CRITICAL (domyślnie: INFO)
 ```
 
 Wszystko gotowe! Uruchom bota za pomocą:
@@ -31,29 +30,45 @@ $ python3 spis.py
 
 ### Globalne
 
-> **/spis** [dodatkowe_opcje: string do wyboru (domyślnie: Brak)]
+> **/spis**
 
-![Wyświetla aktualny stan spisu](https://cdn.discordapp.com/attachments/931884001680031754/938780030874583060/unknown.png)
+![Wyświetla aktualny stan spisu](https://cdn.discordapp.com/attachments/931884001680031754/1046541847713034342/image.png)
+
+> **/info**
+
+![Wyświetla statystyki i informacje o bocie](https://cdn.discordapp.com/attachments/931884001680031754/1046542237921722449/image.png)
 
 ### Dla edytorów
 
-> **/dodaj_zadanie <opis: string> <termin: data|godzina|dzień tygodnia>** [przedmiot: string do wyboru (domyślnie: Inny)]
+> **/dodaj zadanie**
 
-![Dodaje nowe zadanie do spisu](https://cdn.discordapp.com/attachments/931884001680031754/938780752382918666/unknown.png)
+![Dodaje nowe zadanie do spisu](https://cdn.discordapp.com/attachments/931884001680031754/1046542914056105984/image.png)
 
-> **/usun_zadanie <id: liczba w formacie szesnastkowym>**
+> **/dodaj ogloszenie**
 
-![Usuwa zadanie o podanym ID ze spisu](https://cdn.discordapp.com/attachments/931884001680031754/938165033106538526/unknown.png)
+![Dodaje nowe ogłoszenie do spisu](https://cdn.discordapp.com/attachments/931884001680031754/1046543246668595260/image.png)
+
+> **/edytuj zadanie**
+
+![Edytuje zadanie o podanym ID](https://cdn.discordapp.com/attachments/931884001680031754/1046544727945777202/image.png)
+
+> **/edytuj ogloszenie**
+
+![Edytuje ogłoszenie o podanym ID](https://cdn.discordapp.com/attachments/931884001680031754/1046544322012663839/image.png)
+
+> **/usun**
+
+![Usuwa zadanie lub ogłoszenie o podanym ID ze spisu](https://cdn.discordapp.com/attachments/931884001680031754/1046543944357519360/image.png)
 
 ### Dla developera
 
-> **/zapisz_stan**
+> **/dev zapisz**
 
-![Zapisuje stan bota do pliku i wysyła go do twórcy bota](https://cdn.discordapp.com/attachments/931884001680031754/938781136576999535/unknown.png)
+![Zapisuje stan bota do pliku i wysyła go do twórcy bota](https://cdn.discordapp.com/attachments/931884001680031754/1046545104615252008/image.png)
 
-> **/wczytaj_stan**
+> **/dev wczytaj**
 
-![Wczytuje stan bota z kanału prywatnego twórcy bota (liczy się tylko ostatnia wiadomość)](https://cdn.discordapp.com/attachments/931884001680031754/938785280188620800/unknown.png)
+![Wczytuje stan bota z kanału prywatnego twórcy bota (liczy się tylko ostatnia wiadomość)](https://cdn.discordapp.com/attachments/931884001680031754/1046545798558658650/image.png)
 
 ## Format daty
 
