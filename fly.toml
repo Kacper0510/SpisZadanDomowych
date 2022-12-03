@@ -5,6 +5,9 @@ kill_timeout = 10
 [processes]
   worker = "python -m spis"
 
+[deploy]
+  strategy = "rolling"
+
 [build]
   builder = "paketobuildpacks/builder:base"
   buildpacks = ["gcr.io/paketo-buildpacks/python"]
