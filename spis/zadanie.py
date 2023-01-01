@@ -46,6 +46,7 @@ class Ogloszenie:
         @tasks.loop(seconds=termin, count=2)
         async def usun_zadanie_po_terminie():
             if self.termin_usuniecia < datetime.now():  # Upewnij się, że to już czas
+                logger.info(f'Automatycznie usunięto zadanie: {self!r}')
                 from .main import bot
                 bot.stan.lista_zadan.remove(self)
 
