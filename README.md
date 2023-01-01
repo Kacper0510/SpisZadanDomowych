@@ -10,7 +10,7 @@ Bot jest przygotowany pod użycie w Heroku, aczkolwiek można go też zainstalow
 ```sh
 $ git clone https://github.com/Kacper0510/SpisZadanDomowych
 $ cd SpisZadanDomowych
-$ python3 -m pip install -r requirements.txt
+$ python -m pip install -r requirements.txt
 ```
 
 Należy następnie ustawić zmienne środowiskowe:
@@ -23,7 +23,7 @@ Spis_LogLevel = opcjonalne; DEBUG|INFO|WARNING|ERROR|CRITICAL (domyślnie: INFO)
 
 Wszystko gotowe! Uruchom bota za pomocą:
 ```sh
-$ python3 spis.py
+$ python -m spis
 ```
 
 ## Komendy

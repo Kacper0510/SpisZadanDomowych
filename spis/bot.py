@@ -45,6 +45,11 @@ class StanBota:
 class SpisBot(discord.Bot):
     """Rozszerzenie podstawowego bota o potrzebne metody"""
 
+    # Problem z pycordem - ta metoda nie została zaimplementowana
+    async def register_command(self, command: discord.ApplicationCommand, force: bool = True,
+                               guild_ids: list[int] | None = None) -> None:
+        await self.register_commands([command], guild_ids, force=force)
+
     def __init__(self, *args, **kwargs):
         """Inicjalizacja zmiennych"""
         super().__init__(*args, **kwargs)
