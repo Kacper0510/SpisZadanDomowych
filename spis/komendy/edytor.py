@@ -1,3 +1,25 @@
+#  MIT License
+#
+#  Copyright (c) 2023 Kacper Wojciuch
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in all
+#  copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#  SOFTWARE.
+
 from datetime import datetime
 from logging import getLogger
 from typing import cast
@@ -152,6 +174,8 @@ class KomendyDlaEdytorow(Cog):
         if przedmiot is not None:
             zmiany.append("przedmiot")
 
+        # Użycie SortedList wymusza ponowne dodanie zadania
+        self.bot.stan.lista_zadan.remove(znaleziono)
         if len(zmiany) == 0:
             logger.debug(f'Użytkownik {ctx.author!r} nic nie zmienił w zadaniu: {znaleziono!r}')
             await ctx.respond("Nic nie zostało zmienione!")
@@ -165,6 +189,7 @@ class KomendyDlaEdytorow(Cog):
             znaleziono.stworz_task()
         if "przedmiot" in zmiany:
             znaleziono.przedmiot = Przedmioty.lista()[przedmiot]
+        self.bot.stan.lista_zadan.add(znaleziono)
 
         logger.info(f'Użytkownik {ctx.author!r} edytował zadanie: {znaleziono!r}')
 
@@ -213,6 +238,8 @@ class KomendyDlaEdytorow(Cog):
                 await ctx.respond("Wystąpił błąd przy konwersji daty!")
                 return
 
+        # Użycie SortedList wymusza ponowne dodanie ogłoszenia
+        self.bot.stan.lista_zadan.remove(znaleziono)
         if len(zmiany) == 0:
             logger.debug(f'Użytkownik {ctx.author!r} nic nie zmienił w ogłoszeniu: {znaleziono!r}')
             await ctx.respond("Nic nie zostało zmienione!")
@@ -223,6 +250,7 @@ class KomendyDlaEdytorow(Cog):
             znaleziono.termin_usuniecia = data_p
             znaleziono.task.cancel()
             znaleziono.stworz_task()
+        self.bot.stan.lista_zadan.add(znaleziono)
 
         logger.info(f'Użytkownik {ctx.author!r} edytował ogłoszenie: {znaleziono!r}')
 

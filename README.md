@@ -1,12 +1,11 @@
 <h1 align="center">Spis Zadań Domowych</h1>
 
-## Podstawowe informacje
-Jest to bot na platformie Discord służący do zarządzania spisem zadań domowych i go wyświetlania.
+**Spis Zadań Domowych** to bot na platformę [Discord](https://discord.com/), służący do wygodnego zapisu szkolnych zadań domowych i ich wyświetlania.
 
 ## Instalacja
 Spis pisany jest pod **Pythona 3.10**, więc niekoniecznie będzie działał na poprzednich wersjach.
 
-Bot jest przygotowany pod użycie w Heroku, aczkolwiek można go też zainstalować manualnie:
+Bot jest przygotowany do hostowania na [fly.io](https://fly.io/) (patrz: [branch](https://github.com/Kacper0510/SpisZadanDomowych/tree/fly.io)) lub [Heroku](https://www.heroku.com/), aczkolwiek można go też zainstalować manualnie:
 ```sh
 $ git clone https://github.com/Kacper0510/SpisZadanDomowych
 $ cd SpisZadanDomowych
@@ -20,6 +19,11 @@ Spis_Dev = opcjonalne; ID serwera, na którym rejestrowane są komendy developer
 Spis_Autosave = opcjonalne; prawda|fałsz (domyślnie: prawda)
 Spis_LogLevel = opcjonalne; DEBUG|INFO|WARNING|ERROR|CRITICAL (domyślnie: INFO)
 ```
+
+Można także edytować następujące pliki do zmiany innych ustawień:
+- [bot.py](spis/bot.py) - klasa `StanBota`, pole `edytor`
+- [styl.py](spis/style/styl.py) - zmiana domyślnego stylu wyświetlania
+- [przedmiot.py](spis/przedmiot.py) - lista przedmiotów szkolnych
 
 Wszystko gotowe! Uruchom bota za pomocą:
 ```sh
@@ -77,6 +81,8 @@ Dzięki temu większość polskich formatów dat zostaje przyjęta i poprawnie z
 
 Użytkownik może podać datę, godzinę, dzień tygodnia lub kilka z tych rzeczy naraz.
 W przypadku niejednoznacznych dat (np. **01.02.03**), domyślny format to **DD.MM.RR**.
+
+Dozwolone jest także użycie słowa `jutro`.
 
 ### Dozwolone oznaczenia miesięcy
 
