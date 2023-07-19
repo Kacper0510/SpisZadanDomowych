@@ -1,3 +1,25 @@
+#  MIT License
+#
+#  Copyright (c) 2023 Kacper Wojciuch
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in all
+#  copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#  SOFTWARE.
+
 from __future__ import annotations
 
 from enum import Enum
@@ -11,28 +33,25 @@ from typing import cast
 @total_ordering
 class Przedmioty(Enum):
     """Enumeracja wszystkich przedmiotów szkolnych.
-    Pierwszy string w wartości danego przedmiotu jest jego nazwą, drugi - ogólnodostępnym emoji (np. flagą),
-    a pozostałe - customowymi emoji, np. z twarzą nauczyciela."""
+    Pierwszy string w wartości danego przedmiotu jest jego nazwą, drugi - domyślnym emoji (np. flagą),
+    a pozostałe - alternatywnymi emoji (opcja do włączenia jako styl).
 
-    ANGIELSKI = "Angielski", "🇬🇧", "<:iwona_respect:853216948993261588>"
-    POLSKI = "Polski", "🇵🇱", "<:suchy:901068934751584276>"
-    MATEMATYKA = "Matematyka", "🧮", "📏", "<:krawat:750788981611823156>"
+    W celu dostosowania przedmiotów, wystarczy zmienić jedynie poniższe definicje."""
+
+    ANGIELSKI = "Angielski", "🇬🇧", "🇺🇸"
+    POLSKI = "Polski", "🇵🇱"
+    MATEMATYKA = "Matematyka", "🧮", "📏", "🔢", "🔠"
     RELIGIA = "Religia", "✝"
-    MATMA_UZUP = "Matematyka uzupełniająca", "🔢", "🔠"
-    INFA_RACZEK = "Informatyka (Raczek)", "🖥️", "<:raczek_wow:940921731332341781>"
-    INFA_HERMA = "Informatyka (Herma)", "💻", "<:herma:811601136741908542>", "<:herma_1_klasa:720881659934802001>"
-    NIEMIECKI_BABICZ = "Niemiecki (Babicz)", "🇩🇪"
-    NIEMIECKI_SYCH = "Niemiecki (Sych)", "🇩🇪"
-    WF = "WF", "⚽", "🥅", "🤾‍", "🏀", "<:kasia:713312772670226443>"
+    INFORMATYKA = "Informatyka", "🖥️", "💻"
+    NIEMIECKI = "Niemiecki", "🇩🇪"
+    WF = "WF", "⚽", "🥅", "🤾‍", "🏀"
     HISTORIA = "Historia", "🏰"
     WYCHOWAWCZA = "Godzina wychowawcza", "✏️"
-    # # Trzecia klasa
-    # CHEMIA = "Chemia", "🧪", "🧑‍🔬"
-    # FIZYKA = "Fizyka", "🛰️", "🔌"
-    # PRZEDSIEBIORCZOSC = "Przedsiębiorczość", "💰"
-    # ANGIELSKI_UZUP = "Angielski uzupełniający", "🇺🇸"
-    # BIOLOGIA = "Biologia", "🐟", "🍃"
-    # GEOGRAFIA = "Geografia", "🌍"
+    CHEMIA = "Chemia", "🧪", "🧑‍🔬"
+    FIZYKA = "Fizyka", "🛰️", "🔌"
+    PRZEDSIEBIORCZOSC = "Przedsiębiorczość", "💰"
+    BIOLOGIA = "Biologia", "🐟", "🍃"
+    GEOGRAFIA = "Geografia", "🌍"
 
     def __reduce_ex__(self, protocol):
         """Pozwala na skuteczniejsze pamięciowo picklowanie przedmiotów poprzez zapamiętanie tylko nazwy"""
